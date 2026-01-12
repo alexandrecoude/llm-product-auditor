@@ -14,20 +14,390 @@ st.set_page_config(
     layout="wide"
 )
 
-# Configuration du style
+# Configuration de la page
+st.set_page_config(
+    page_title="LLM Product Auditor - GEO",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# CSS personnalisé inspiré de Finary
 st.markdown("""
 <style>
-    .main > div {
-        padding-top: 2rem;
+    /* Imports Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    /* Variables globales */
+    :root {
+        --primary-color: #6366f1;
+        --secondary-color: #8b5cf6;
+        --accent-color: #f59e0b;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --danger-color: #ef4444;
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
     }
+    
+    /* Reset & Base */
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+    
+    /* Corps principal */
+    .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 0 !important;
+    }
+    
+    .block-container {
+        padding: 3rem 4rem !important;
+        max-width: 1400px !important;
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        margin: 2rem auto !important;
+        box-shadow: var(--shadow-xl);
+    }
+    
+    /* Titres */
+    h1 {
+        font-size: 3rem !important;
+        font-weight: 800 !important;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem !important;
+        letter-spacing: -0.02em !important;
+    }
+    
+    h2 {
+        font-size: 1.875rem !important;
+        font-weight: 700 !important;
+        color: var(--text-primary) !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    h3 {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--text-primary) !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+    
+    /* Sous-titre */
+    .element-container:has(> .stMarkdown > p:first-child) p:first-of-type {
+        font-size: 1.125rem !important;
+        color: var(--text-secondary) !important;
+        font-weight: 400 !important;
+        line-height: 1.75 !important;
+    }
+    
+    /* Cards et containers */
+    .stExpander {
+        background: white !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--radius-md) !important;
+        box-shadow: var(--shadow-sm) !important;
+        margin-bottom: 1rem !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stExpander:hover {
+        box-shadow: var(--shadow-md) !important;
+        transform: translateY(-2px);
+    }
+    
+    .stExpander > div:first-child {
+        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 1.25rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        font-size: 2.5rem !important;
+        font-weight: 800 !important;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--text-secondary) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+    }
+    
+    /* Boutons */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        box-shadow: var(--shadow-md) !important;
+        transition: all 0.3s ease !important;
+        text-transform: none !important;
+    }
+    
+    .stButton > button:hover {
+        box-shadow: var(--shadow-lg) !important;
+        transform: translateY(-2px);
+    }
+    
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.625rem 1.5rem !important;
+        font-weight: 600 !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+    
+    /* Inputs */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stTextArea > div > div > textarea {
+        border: 2px solid var(--border-color) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 1rem !important;
+        transition: all 0.3s ease !important;
+        background: white !important;
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+    }
+    
+    /* Select boxes */
+    .stSelectbox > div > div {
+        border: 2px solid var(--border-color) !important;
+        border-radius: var(--radius-md) !important;
+        background: white !important;
+    }
+    
+    /* Alerts */
     .stAlert {
-        margin-top: 1rem;
+        background: linear-gradient(135deg, #ede9fe 0%, #f3f4f6 100%) !important;
+        border: none !important;
+        border-left: 4px solid var(--primary-color) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 1rem 1.25rem !important;
+        color: var(--text-primary) !important;
+    }
+    
+    .stSuccess {
+        background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%) !important;
+        border-left-color: var(--success-color) !important;
+    }
+    
+    .stWarning {
+        background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%) !important;
+        border-left-color: var(--warning-color) !important;
+    }
+    
+    .stError {
+        background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%) !important;
+        border-left-color: var(--danger-color) !important;
+    }
+    
+    /* Progress bar */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+        border-radius: 9999px !important;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%) !important;
+        border-right: 1px solid var(--border-color) !important;
+        padding: 2rem 1.5rem !important;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown {
+        color: var(--text-primary) !important;
+    }
+    
+    /* Code blocks */
+    code {
+        background: var(--bg-secondary) !important;
+        color: var(--primary-color) !important;
+        padding: 0.25rem 0.5rem !important;
+        border-radius: var(--radius-sm) !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Tables */
+    table {
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        width: 100% !important;
+        border-radius: var(--radius-md) !important;
+        overflow: hidden !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+    
+    thead {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+    }
+    
+    thead th {
+        color: white !important;
+        font-weight: 600 !important;
+        padding: 1rem !important;
+        text-align: left !important;
+    }
+    
+    tbody tr {
+        background: white !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+    
+    tbody tr:hover {
+        background: var(--bg-secondary) !important;
+    }
+    
+    tbody td {
+        padding: 1rem !important;
+        color: var(--text-primary) !important;
+    }
+    
+    /* Badges pour les priorités */
+    .priority-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .badge-critical {
+        background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+        color: #dc2626;
+    }
+    
+    .badge-important {
+        background: linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%);
+        color: #ea580c;
+    }
+    
+    .badge-recommended {
+        background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+        color: #ca8a04;
+    }
+    
+    .badge-bonus {
+        background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+        color: #059669;
+    }
+    
+    /* Dividers */
+    hr {
+        border: none !important;
+        height: 1px !important;
+        background: var(--border-color) !important;
+        margin: 2rem 0 !important;
+    }
+    
+    /* Colonnes */
+    [data-testid="column"] {
+        background: transparent !important;
+        padding: 0.5rem !important;
+    }
+    
+    /* Scrollbar personnalisée */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--bg-secondary);
+        border-radius: 9999px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        border-radius: 9999px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--secondary-color);
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .element-container {
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 1.5rem 1rem !important;
+            margin: 1rem !important;
+        }
+        
+        h1 {
+            font-size: 2rem !important;
+        }
+        
+        h2 {
+            font-size: 1.5rem !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🔍 LLM Product Page Auditor - Optimisation GEO")
-st.markdown("**Auditez et optimisez vos pages produits pour les LLMs** (ChatGPT, Claude, Perplexity, etc.) : analyse approfondie, scoring par catégorie et recommandations priorisées.")
+st.markdown("""
+<div style='text-align: center; margin-bottom: 2rem;'>
+    <h1 style='margin-bottom: 0.5rem;'>🔍 LLM Product Auditor</h1>
+    <div style='display: inline-block; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 1rem;'>
+        OPTIMISATION GEO
+    </div>
+    <p style='font-size: 1.25rem; color: #64748b; max-width: 800px; margin: 1rem auto 0 auto; line-height: 1.6;'>
+        Auditez et optimisez vos pages produits pour les LLMs (ChatGPT, Claude, Perplexity, etc.)
+        <br><span style='font-size: 1rem; color: #94a3b8;'>Analyse approfondie • Scoring par catégorie • Recommandations priorisées</span>
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # Sidebar pour les paramètres
 with st.sidebar:
@@ -766,18 +1136,52 @@ if scan_button:
                 st.session_state.results = results
                 st.session_state.root_url = root_url
                 
-                # Statistiques globales
+                # Statistiques globales avec style moderne
                 total = len(results)
                 products = len([r for r in results if r["type"] == "product"])
                 avg_score = sum(r["score"] for r in results) / total if total > 0 else 0
+                to_optimize = len([r for r in results if r["score"] < 70])
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("### 📊 Aperçu de l'audit")
                 
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("📄 Pages analysées", total)
-                col2.metric("🛍️ Pages produits", products)
-                col3.metric("📊 Score moyen", f"{avg_score:.0f}/100")
-                col4.metric("⚠️ Pages à optimiser", len([r for r in results if r["score"] < 70]))
                 
-                st.success(f"✅ Scan terminé ! {total} page(s) analysée(s)")
+                with col1:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #ede9fe 0%, #f3f4f6 100%); padding: 1.5rem; border-radius: 16px; border-left: 4px solid #6366f1; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                        <div style='color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>PAGES ANALYSÉES</div>
+                        <div style='font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'>{total}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%); padding: 1.5rem; border-radius: 16px; border-left: 4px solid #10b981; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                        <div style='color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>PAGES PRODUITS</div>
+                        <div style='font-size: 2.5rem; font-weight: 800; color: #10b981;'>{products}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    score_color = "#10b981" if avg_score >= 70 else "#f59e0b" if avg_score >= 40 else "#ef4444"
+                    score_bg = "linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)" if avg_score >= 70 else "linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%)" if avg_score >= 40 else "linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%)"
+                    st.markdown(f"""
+                    <div style='background: {score_bg}; padding: 1.5rem; border-radius: 16px; border-left: 4px solid {score_color}; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                        <div style='color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>SCORE MOYEN</div>
+                        <div style='font-size: 2.5rem; font-weight: 800; color: {score_color};'>{avg_score:.0f}<span style='font-size: 1.5rem; color: #94a3b8;'>/100</span></div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col4:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%); padding: 1.5rem; border-radius: 16px; border-left: 4px solid #ea580c; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                        <div style='color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>À OPTIMISER</div>
+                        <div style='font-size: 2.5rem; font-weight: 800; color: #ea580c;'>{to_optimize}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.success(f"✅ Scan terminé ! {total} page(s) analysée(s) • {products} page(s) produit détectée(s)")
             
         except Exception as e:
             st.error(f"❌ Erreur lors du scan : {str(e)}")
@@ -860,43 +1264,74 @@ if "results" in st.session_state and st.session_state.results:
             # Scores par catégorie (si disponibles)
             if "score_breakdown" in r:
                 st.markdown("---")
-                st.subheader("📊 Score détaillé par catégorie")
+                st.markdown("#### 📊 Scores détaillés")
                 
-                col1, col2, col3, col4 = st.columns(4)
                 breakdown = r["score_breakdown"]
                 
-                with col1:
-                    st.metric(
-                        "🔢 Données Structurées",
-                        f"{breakdown['structured_data']}/40",
-                        help="Schema.org Product, FAQ, Breadcrumb"
-                    )
+                # Données structurées
+                pct_struct = (breakdown['structured_data'] / 40) * 100
+                color_struct = "#10b981" if pct_struct >= 70 else "#f59e0b" if pct_struct >= 40 else "#ef4444"
+                st.markdown(f"""
+                <div style='margin-bottom: 1rem;'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.25rem;'>
+                        <span style='font-weight: 600; color: #0f172a; font-size: 0.875rem;'>🔢 Données Structurées</span>
+                        <span style='font-weight: 700; color: {color_struct}; font-size: 0.875rem;'>{breakdown['structured_data']}/40</span>
+                    </div>
+                    <div style='background: #e2e8f0; height: 8px; border-radius: 9999px; overflow: hidden;'>
+                        <div style='background: {color_struct}; height: 100%; width: {pct_struct}%; transition: width 0.3s ease;'></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                with col2:
-                    st.metric(
-                        "📝 Qualité Contenu", 
-                        f"{breakdown['content_quality']}/30",
-                        help="Longueur, structure, tableaux, listes"
-                    )
+                # Contenu
+                pct_content = (breakdown['content_quality'] / 30) * 100
+                color_content = "#10b981" if pct_content >= 70 else "#f59e0b" if pct_content >= 40 else "#ef4444"
+                st.markdown(f"""
+                <div style='margin-bottom: 1rem;'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.25rem;'>
+                        <span style='font-weight: 600; color: #0f172a; font-size: 0.875rem;'>📝 Qualité Contenu</span>
+                        <span style='font-weight: 700; color: {color_content}; font-size: 0.875rem;'>{breakdown['content_quality']}/30</span>
+                    </div>
+                    <div style='background: #e2e8f0; height: 8px; border-radius: 9999px; overflow: hidden;'>
+                        <div style='background: {color_content}; height: 100%; width: {pct_content}%; transition: width 0.3s ease;'></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                with col3:
-                    st.metric(
-                        "🏆 Autorité",
-                        f"{breakdown['authority']}/15",
-                        help="Certifications, auteur, dates"
-                    )
+                # Autorité
+                pct_authority = (breakdown['authority'] / 15) * 100
+                color_authority = "#10b981" if pct_authority >= 70 else "#f59e0b" if pct_authority >= 40 else "#ef4444"
+                st.markdown(f"""
+                <div style='margin-bottom: 1rem;'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.25rem;'>
+                        <span style='font-weight: 600; color: #0f172a; font-size: 0.875rem;'>🏆 Autorité</span>
+                        <span style='font-weight: 700; color: {color_authority}; font-size: 0.875rem;'>{breakdown['authority']}/15</span>
+                    </div>
+                    <div style='background: #e2e8f0; height: 8px; border-radius: 9999px; overflow: hidden;'>
+                        <div style='background: {color_authority}; height: 100%; width: {pct_authority}%; transition: width 0.3s ease;'></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                with col4:
-                    st.metric(
-                        "🏷️ Métadonnées",
-                        f"{breakdown['metadata']}/15",
-                        help="Meta description, Open Graph, Title"
-                    )
+                # Métadonnées
+                pct_metadata = (breakdown['metadata'] / 15) * 100
+                color_metadata = "#10b981" if pct_metadata >= 70 else "#f59e0b" if pct_metadata >= 40 else "#ef4444"
+                st.markdown(f"""
+                <div style='margin-bottom: 1rem;'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.25rem;'>
+                        <span style='font-weight: 600; color: #0f172a; font-size: 0.875rem;'>🏷️ Métadonnées</span>
+                        <span style='font-weight: 700; color: {color_metadata}; font-size: 0.875rem;'>{breakdown['metadata']}/15</span>
+                    </div>
+                    <div style='background: #e2e8f0; height: 8px; border-radius: 9999px; overflow: hidden;'>
+                        <div style='background: {color_metadata}; height: 100%; width: {pct_metadata}%; transition: width 0.3s ease;'></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
             # Recommandations priorisées
             if r["recommendations"]:
                 st.markdown("---")
-                st.subheader("💡 Recommandations GEO (Optimisation LLM)")
+                st.markdown("#### 💡 Recommandations GEO")
                 
                 # Grouper par priorité
                 critiques = [rec for rec in r["recommendations"] if "CRITIQUE" in rec.get("priority", "")]
@@ -904,31 +1339,69 @@ if "results" in st.session_state and st.session_state.results:
                 recommandees = [rec for rec in r["recommendations"] if "RECOMMANDÉ" in rec.get("priority", "")]
                 bonus = [rec for rec in r["recommendations"] if "BONUS" in rec.get("priority", "")]
                 
-                # Afficher par priorité
+                # Afficher par priorité avec style moderne
                 if critiques:
-                    st.markdown("##### 🔴 Actions Critiques (à faire en priorité)")
+                    st.markdown("""
+                    <div style='background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%); padding: 1rem 1.25rem; border-radius: 12px; border-left: 4px solid #ef4444; margin-bottom: 1rem;'>
+                        <div style='font-weight: 700; color: #dc2626; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;'>
+                            🔴 ACTIONS CRITIQUES (à faire en priorité)
+                        </div>
+                    """, unsafe_allow_html=True)
                     for rec in critiques:
-                        with st.container():
-                            st.markdown(f"**{rec['category']}** - {rec['text']}")
-                            st.caption(f"💥 Impact: {rec['impact']}")
+                        st.markdown(f"""
+                        <div style='background: white; padding: 0.875rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);'>
+                            <div style='font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;'>
+                                <span style='background: #fee2e2; color: #dc2626; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;'>{rec['category']}</span>
+                                {rec['text']}
+                            </div>
+                            <div style='color: #64748b; font-size: 0.875rem;'>💥 Impact: {rec['impact']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 if importantes:
-                    st.markdown("##### 🟠 Actions Importantes")
+                    st.markdown("""
+                    <div style='background: linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%); padding: 1rem 1.25rem; border-radius: 12px; border-left: 4px solid #ea580c; margin-bottom: 1rem;'>
+                        <div style='font-weight: 700; color: #ea580c; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;'>
+                            🟠 ACTIONS IMPORTANTES
+                        </div>
+                    """, unsafe_allow_html=True)
                     for rec in importantes:
-                        with st.container():
-                            st.markdown(f"**{rec['category']}** - {rec['text']}")
-                            st.caption(f"📈 Impact: {rec['impact']}")
+                        st.markdown(f"""
+                        <div style='background: white; padding: 0.875rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);'>
+                            <div style='font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;'>
+                                <span style='background: #fed7aa; color: #ea580c; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;'>{rec['category']}</span>
+                                {rec['text']}
+                            </div>
+                            <div style='color: #64748b; font-size: 0.875rem;'>📈 Impact: {rec['impact']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 if recommandees:
-                    with st.expander("🟡 Actions Recommandées (cliquez pour voir)", expanded=False):
+                    with st.expander("🟡 Actions Recommandées (cliquer pour voir)", expanded=False):
                         for rec in recommandees:
-                            st.markdown(f"**{rec['category']}** - {rec['text']}")
-                            st.caption(f"Impact: {rec['impact']}")
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%); padding: 0.875rem; border-radius: 8px; margin-bottom: 0.5rem;'>
+                                <div style='font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;'>
+                                    <span style='background: #fbbf24; color: white; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;'>{rec['category']}</span>
+                                    {rec['text']}
+                                </div>
+                                <div style='color: #64748b; font-size: 0.875rem;'>Impact: {rec['impact']}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
                 
                 if bonus:
                     with st.expander("🟢 Améliorations Bonus", expanded=False):
                         for rec in bonus:
-                            st.markdown(f"**{rec['category']}** - {rec['text']}")
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%); padding: 0.875rem; border-radius: 8px; margin-bottom: 0.5rem;'>
+                                <div style='font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;'>
+                                    <span style='background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;'>{rec['category']}</span>
+                                    {rec['text']}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
             
             # Détails techniques (expandable)
             if "findings" in r:
