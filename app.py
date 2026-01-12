@@ -83,8 +83,10 @@ with st.sidebar:
 SITEMAP_RE = re.compile(r"<loc>(.*?)</loc>", re.IGNORECASE)
 
 def same_domain(url: str, root: str) -> bool:
-    """Vérifie si l'URL appartient au même domaine que la racine"""
-    return urlparse(url).netloc == urlparse(root).netloc
+    """Vérifie si l'URL appartient au même domaine que la racine (gère www/non-www)"""
+    url_domain = urlparse(url).netloc.lower().replace('www.', '')
+    root_domain = urlparse(root).netloc.lower().replace('www.', '')
+    return url_domain == root_domain
 
 def url_allowed(url: str, include_pattern: str, exclude_patterns: list) -> bool:
     """Vérifie si l'URL respecte les filtres"""
