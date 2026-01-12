@@ -221,26 +221,55 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     # Découverte des URLs
     urls = await discover_urls(root_url, progress_bar)
     
+    # Debug : échantillon d'URLs découvertes
+    sample_urls = urls[:5] if len(urls) > 0 else []
+    
     # Filtrage avec debug
     urls_discovered = len(urls)
+    urls_before_domain = urls.copy()
     urls = [u for u in urls if same_domain(u, root_url)]
     urls_after_domain = len(urls)
+    
+    # Debug : pourquoi certaines URLs sont rejetées
+    rejected_by_domain = []
+    if urls_after_domain < urls_discovered:
+        for u in urls_before_domain[:5]:
+            if not same_domain(u, root_url):
+                url_domain = urlparse(u).netloc.lower().replace('www.', '')
+                root_domain = urlparse(root_url).netloc.lower().replace('www.', '')
+                rejected_by_domain.append(f"{u} (domaine: {url_domain} vs {root_domain})")
+    
     urls = [u for u in urls if url_allowed(u, include_pattern, exclude_patterns)]
     urls_after_patterns = len(urls)
     urls = urls[:max_pages]
     
     # Vérification si on a des URLs à analyser
     if len(urls) == 0:
+        suggestions = [
+            f"📊 **Debug** : {urls_discovered} URLs découvertes → {urls_after_domain} après filtre domaine → {urls_after_patterns} après filtres patterns",
+            f"🌐 **Domaine root** : `{urlparse(root_url).netloc}` (sans www: `{urlparse(root_url).netloc.lower().replace('www.', '')}`)",
+        ]
+        
+        if sample_urls:
+            suggestions.append(f"🔗 **Échantillon d'URLs trouvées** :")
+            for url in sample_urls[:3]:
+                suggestions.append(f"   - {url}")
+        
+        if rejected_by_domain:
+            suggestions.append(f"❌ **URLs rejetées par filtre domaine** :")
+            for rej in rejected_by_domain[:3]:
+                suggestions.append(f"   - {rej}")
+        
+        suggestions.extend([
+            f"🔍 **Pattern inclusion** : `{include_pattern if include_pattern else '(aucun)'}`",
+            f"🚫 **Patterns exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`",
+            "💡 **Solution** : Copiez une URL du sitemap ci-dessus et utilisez-la directement"
+        ])
+        
         return {
             "error": True,
             "message": f"Aucune URL trouvée après filtrage.",
-            "suggestions": [
-                f"📊 **Debug** : {urls_discovered} URLs découvertes → {urls_after_domain} après filtre domaine → {urls_after_patterns} après filtres patterns",
-                f"🔍 **Pattern inclusion** : `{include_pattern if include_pattern else '(aucun)'}`",
-                f"🚫 **Patterns exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`",
-                "💡 **Solution** : Sélectionnez 'Aucun filtre' ET vérifiez que le message jaune apparaît dans la sidebar",
-                "💡 **Ou** : Entrez directement une URL de page produit"
-            ]
+            "suggestions": suggestions
         }
     
     status_text.text(f"📊 Analyse de {len(urls)} page(s)...")
