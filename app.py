@@ -125,6 +125,70 @@ async def fetch_text(client: httpx.AsyncClient, url: str) -> str:
     r.raise_for_status()
     return r.text
 
+def extract_categories_from_urls(urls: list[str], base_domain: str) -> dict:
+    """
+    Extrait les catégories des URLs basées sur les segments de path.
+    Retourne un dict avec {categorie: nombre_urls}
+    """
+    from collections import Counter
+    
+    categories = []
+    
+    for url in urls:
+        parsed = urlparse(url)
+        
+        # Extraire les segments du path
+        path = parsed.path.strip('/')
+        if not path:
+            continue
+            
+        segments = path.split('/')
+        
+        # Prendre le premier segment comme catégorie
+        # Ex: /vetements/pantalons/... -> "vetements"
+        if segments and segments[0]:
+            category = segments[0]
+            # Filtrer les catégories techniques communes
+            excluded = ['sitemap', 'index', 'page', 'wp-content', 'admin', 'api', 
+                       'wp-json', 'feed', 'author', 'tag', 'category', 'search',
+                       'cart', 'checkout', 'account', 'login', 'register']
+            if category not in excluded and not category.startswith('wp-'):
+                categories.append(category)
+    
+    # Compter les occurrences
+    category_counts = Counter(categories)
+    
+    # Retourner seulement les catégories avec au moins 3 URLs (plus significatif)
+    return dict(sorted(
+        [(cat, count) for cat, count in category_counts.items() if count >= 3],
+        key=lambda x: x[1],
+        reverse=True
+    ))
+
+def filter_urls_by_categories(urls: list[str], selected_categories: list[str]) -> list[str]:
+    """
+    Filtre les URLs pour ne garder que celles des catégories sélectionnées.
+    Si selected_categories est vide, retourne toutes les URLs.
+    """
+    if not selected_categories or "Toutes les catégories" in selected_categories:
+        return urls
+    
+    filtered = []
+    
+    for url in urls:
+        parsed = urlparse(url)
+        path = parsed.path.strip('/')
+        if not path:
+            continue
+            
+        segments = path.split('/')
+        
+        # Vérifier si le premier segment correspond à une catégorie sélectionnée
+        if segments and segments[0] in selected_categories:
+            filtered.append(url)
+    
+    return filtered
+
 async def discover_urls(root_url: str, progress_bar) -> list[str]:
     """Découvre les URLs via sitemap.xml"""
     sitemap_url = urljoin(root_url.rstrip("/") + "/", "sitemap.xml")
@@ -580,7 +644,7 @@ def score_page(html: str) -> dict:
     }
 
 async def run_audit(root_url: str, max_pages: int, include_pattern: str, 
-                   exclude_patterns: list, progress_bar, status_text):
+                   exclude_patterns: list, progress_bar, status_text, selected_categories: list = None):
     """Lance l'audit complet du site"""
     
     # Découverte des URLs
@@ -594,6 +658,13 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     urls_before_domain = urls.copy()
     urls = [u for u in urls if same_domain(u, root_url)]
     urls_after_domain = len(urls)
+    
+    # NOUVEAU : Filtrage par catégories si sélectionnées
+    urls_after_categories = urls_after_domain
+    if selected_categories and "Toutes les catégories" not in selected_categories:
+        urls = filter_urls_by_categories(urls, selected_categories)
+        urls_after_categories = len(urls)
+        status_text.text(f"📁 Filtrage par catégories : {urls_after_domain} → {urls_after_categories} URLs")
     
     # Debug : pourquoi certaines URLs sont rejetées
     rejected_by_domain = []
@@ -611,9 +682,14 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     # Vérification si on a des URLs à analyser
     if len(urls) == 0:
         suggestions = [
-            f"📊 **Debug** : {urls_discovered} URLs découvertes → {urls_after_domain} après filtre domaine → {urls_after_patterns} après filtres patterns",
-            f"🌐 **Domaine root** : `{urlparse(root_url).netloc}` (sans www: `{urlparse(root_url).netloc.lower().replace('www.', '')}`)",
+            f"📊 **Debug** : {urls_discovered} URLs découvertes → {urls_after_domain} après filtre domaine",
         ]
+        
+        if selected_categories and "Toutes les catégories" not in selected_categories:
+            suggestions.append(f"📁 → {urls_after_categories} après filtre catégories ({', '.join(selected_categories)})")
+        
+        suggestions.append(f"🔍 → {urls_after_patterns} après filtres patterns")
+        suggestions.append(f"🌐 **Domaine root** : `{urlparse(root_url).netloc}` (sans www: `{urlparse(root_url).netloc.lower().replace('www.', '')}`)")
         
         if sample_urls:
             suggestions.append(f"🔗 **Échantillon d'URLs trouvées** :")
@@ -703,6 +779,73 @@ root_url = st.text_input(
     placeholder="Ex: https://www.monsite.com ou https://www.monsite.com/produit/chaussures"
 )
 
+# Bouton pour détecter les catégories
+col_detect, col_info = st.columns([1, 3])
+
+with col_detect:
+    detect_categories_btn = st.button("🔍 Détecter les catégories", use_container_width=True)
+
+with col_info:
+    if 'categories' in st.session_state and st.session_state.categories:
+        st.info(f"✅ {len(st.session_state.categories)} catégorie(s) détectée(s)")
+
+# Détection des catégories
+if detect_categories_btn and root_url:
+    with st.spinner("🔍 Analyse du sitemap pour détecter les catégories..."):
+        try:
+            import asyncio
+            
+            # Créer une progress bar temporaire
+            temp_progress = st.progress(0)
+            
+            # Découvrir les URLs du sitemap
+            urls = asyncio.run(discover_urls(root_url, temp_progress))
+            temp_progress.empty()
+            
+            # Extraire les catégories
+            parsed = urlparse(root_url)
+            base_domain = parsed.netloc
+            categories_dict = extract_categories_from_urls(urls, base_domain)
+            
+            if categories_dict:
+                st.session_state.categories = categories_dict
+                st.session_state.discovered_urls = urls
+                st.success(f"✅ {len(categories_dict)} catégorie(s) détectée(s) dans {len(urls)} URLs")
+                st.rerun()
+            else:
+                st.warning("⚠️ Aucune catégorie détectée. Les URLs seront toutes analysées.")
+                st.session_state.categories = {}
+        except Exception as e:
+            st.error(f"❌ Erreur lors de la détection : {str(e)}")
+            st.session_state.categories = {}
+
+# Multiselect des catégories si détectées
+selected_categories = []
+if 'categories' in st.session_state and st.session_state.categories:
+    st.markdown("### 📁 Filtrer par catégories")
+    
+    # Afficher les catégories disponibles avec leur nombre d'URLs
+    category_options = ["Toutes les catégories"] + [
+        f"{cat} ({count} URLs)" for cat, count in st.session_state.categories.items()
+    ]
+    
+    selected = st.multiselect(
+        "Sélectionnez les catégories à analyser",
+        options=category_options,
+        default=["Toutes les catégories"],
+        help="Choisissez une ou plusieurs catégories pour limiter le scan à ces sections du site"
+    )
+    
+    # Extraire les noms de catégories (sans le nombre d'URLs)
+    if "Toutes les catégories" not in selected:
+        selected_categories = [s.split(" (")[0] for s in selected if " (" in s]
+    else:
+        selected_categories = ["Toutes les catégories"]
+    
+    if selected_categories and "Toutes les catégories" not in selected_categories:
+        total_urls = sum(st.session_state.categories[cat] for cat in selected_categories)
+        st.info(f"📊 **{total_urls} URLs** seront analysées dans les catégories sélectionnées")
+
 col1, col2 = st.columns([1, 4])
 
 with col1:
@@ -730,11 +873,19 @@ if scan_button:
     if not root_url:
         st.error("⚠️ Veuillez entrer une URL")
     else:
+        # S'assurer que selected_categories existe
+        if not 'selected_categories' in locals():
+            selected_categories = []
+        
         # Debug : afficher les filtres actifs
         with st.expander("🔧 Debug - Filtres actifs", expanded=False):
             st.write(f"**Template sélectionné** : {template}")
             st.write(f"**Pattern d'inclusion** : `{include_pattern if include_pattern else '(aucun)'}`")
             st.write(f"**Patterns d'exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`")
+            if selected_categories and "Toutes les catégories" not in selected_categories:
+                st.write(f"**Catégories sélectionnées** : {', '.join(selected_categories)}")
+            else:
+                st.write(f"**Catégories** : Toutes (aucun filtre)")
         
         # Affichage de la progression
         progress_bar = st.progress(0)
@@ -749,7 +900,8 @@ if scan_button:
                 include_pattern, 
                 exclude_patterns,
                 progress_bar,
-                status_text
+                status_text,
+                selected_categories  # Ajout du filtrage par catégories
             ))
             
             status_text.empty()
