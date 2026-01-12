@@ -64,7 +64,8 @@ with st.sidebar:
     elif template == "Aucun filtre":
         include_pattern = ""
         exclude_patterns = []
-        st.warning("⚠️ Aucun filtre : toutes les pages seront analysées")
+        st.success("✅ Mode 'Aucun filtre' activé - Toutes les pages seront analysées")
+        st.info(f"🔍 Inclusions : `(aucune)` | Exclusions : `(aucune)`")
     else:
         include_pattern = st.text_input(
             "Pattern d'inclusion (regex)",
@@ -218,22 +219,25 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     # Découverte des URLs
     urls = await discover_urls(root_url, progress_bar)
     
-    # Filtrage
-    urls_before_filter = len(urls)
+    # Filtrage avec debug
+    urls_discovered = len(urls)
     urls = [u for u in urls if same_domain(u, root_url)]
+    urls_after_domain = len(urls)
     urls = [u for u in urls if url_allowed(u, include_pattern, exclude_patterns)]
+    urls_after_patterns = len(urls)
     urls = urls[:max_pages]
     
     # Vérification si on a des URLs à analyser
     if len(urls) == 0:
         return {
             "error": True,
-            "message": f"Aucune URL trouvée après filtrage. {urls_before_filter} URL(s) découverte(s) mais aucune ne correspond aux filtres.",
+            "message": f"Aucune URL trouvée après filtrage.",
             "suggestions": [
-                "✅ Essayez sans filtre (sélectionnez 'Personnalisé' et laissez le champ vide)",
-                "✅ Vérifiez que le site a un sitemap.xml accessible",
-                "✅ Ou entrez directement une URL de page produit",
-                f"✅ URLs découvertes : {urls_before_filter}"
+                f"📊 **Debug** : {urls_discovered} URLs découvertes → {urls_after_domain} après filtre domaine → {urls_after_patterns} après filtres patterns",
+                f"🔍 **Pattern inclusion** : `{include_pattern if include_pattern else '(aucun)'}`",
+                f"🚫 **Patterns exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`",
+                "💡 **Solution** : Sélectionnez 'Aucun filtre' ET vérifiez que le message jaune apparaît dans la sidebar",
+                "💡 **Ou** : Entrez directement une URL de page produit"
             ]
         }
     
@@ -330,6 +334,12 @@ if scan_button:
     if not root_url:
         st.error("⚠️ Veuillez entrer une URL")
     else:
+        # Debug : afficher les filtres actifs
+        with st.expander("🔧 Debug - Filtres actifs", expanded=False):
+            st.write(f"**Template sélectionné** : {template}")
+            st.write(f"**Pattern d'inclusion** : `{include_pattern if include_pattern else '(aucun)'}`")
+            st.write(f"**Patterns d'exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`")
+        
         # Affichage de la progression
         progress_bar = st.progress(0)
         status_text = st.empty()
