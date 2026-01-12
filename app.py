@@ -26,12 +26,33 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🔍 LLM Product Page Auditor")
-st.markdown("**Auditez vos pages produits e-commerce** : détection de schema.org, scoring SEO et recommandations d'optimisation.")
+st.title("🔍 LLM Product Page Auditor - Optimisation GEO")
+st.markdown("**Auditez et optimisez vos pages produits pour les LLMs** (ChatGPT, Claude, Perplexity, etc.) : analyse approfondie, scoring par catégorie et recommandations priorisées.")
 
 # Sidebar pour les paramètres
 with st.sidebar:
     st.header("⚙️ Paramètres du scan")
+    
+    with st.expander("💡 C'est quoi le GEO ?", expanded=False):
+        st.markdown("""
+        **GEO = Generative Engine Optimization**
+        
+        C'est l'optimisation pour les LLMs comme :
+        - 🤖 ChatGPT (OpenAI)
+        - 🧠 Claude (Anthropic)  
+        - 🔍 Perplexity
+        - 💬 Gemini (Google)
+        
+        **Pourquoi c'est important ?**
+        Les gens posent de plus en plus de questions aux IA plutôt qu'à Google. Pour que vos produits soient recommandés, il faut :
+        
+        ✅ Données structurées complètes
+        ✅ Contenu riche et contextualisé
+        ✅ Signaux d'autorité/crédibilité
+        ✅ FAQ et réponses directes
+        
+        **Le GEO = le nouveau SEO !**
+        """)
     
     st.info("""
     💡 **Astuce** : 
@@ -175,53 +196,387 @@ def has_product_schema(jsonlds: list[dict]) -> bool:
             return True
     return False
 
+def analyze_schema_completeness(jsonlds: list[dict]) -> dict:
+    """Analyse la complétude des schemas Product"""
+    product_schemas = [d for d in jsonlds if d.get("@type") in ["Product", "ProductModel"] or 
+                      (isinstance(d.get("@type"), list) and "Product" in d.get("@type"))]
+    
+    if not product_schemas:
+        return {"found": False, "completeness": 0, "missing": []}
+    
+    product = product_schemas[0]
+    
+    # Champs essentiels pour les LLMs
+    essential_fields = {
+        "name": "Nom du produit",
+        "description": "Description détaillée",
+        "image": "Images",
+        "brand": "Marque",
+        "offers": "Informations de prix"
+    }
+    
+    # Champs recommandés pour l'enrichissement
+    recommended_fields = {
+        "sku": "SKU/Référence",
+        "gtin": "Code-barres GTIN/EAN",
+        "mpn": "Numéro fabricant",
+        "aggregateRating": "Note moyenne",
+        "review": "Avis clients"
+    }
+    
+    missing = []
+    score = 0
+    total_points = len(essential_fields) * 2 + len(recommended_fields)
+    
+    # Vérifier les champs essentiels (2 points chacun)
+    for field, label in essential_fields.items():
+        if field in product and product[field]:
+            score += 2
+        else:
+            missing.append(f"Champ essentiel : {label}")
+    
+    # Vérifier les champs recommandés (1 point chacun)
+    for field, label in recommended_fields.items():
+        if field in product and product[field]:
+            score += 1
+        else:
+            missing.append(f"Champ recommandé : {label}")
+    
+    # Vérifier la complétude de l'offre si présente
+    if "offers" in product:
+        offer = product["offers"]
+        if isinstance(offer, dict):
+            if "price" in offer and "priceCurrency" in offer:
+                score += 2
+            if "availability" in offer:
+                score += 1
+                
+    completeness = int((score / total_points) * 100)
+    
+    return {"found": True, "completeness": completeness, "missing": missing, "schema": product}
+
+def analyze_content_quality(soup, text) -> dict:
+    """Analyse la qualité et la structure du contenu"""
+    findings = {}
+    
+    # Longueur du contenu
+    word_count = len(text.split())
+    findings["word_count"] = word_count
+    findings["sufficient_content"] = word_count >= 300
+    
+    # Structure des titres
+    h1 = soup.find_all("h1")
+    h2 = soup.find_all("h2")
+    h3 = soup.find_all("h3")
+    findings["has_h1"] = len(h1) > 0
+    findings["has_hierarchy"] = len(h2) > 0 or len(h3) > 0
+    findings["heading_count"] = len(h1) + len(h2) + len(h3)
+    
+    # Listes et tableaux
+    findings["has_lists"] = len(soup.find_all(["ul", "ol"])) > 0
+    findings["has_tables"] = len(soup.find_all("table")) > 0
+    findings["list_count"] = len(soup.find_all(["ul", "ol"]))
+    findings["table_count"] = len(soup.find_all("table"))
+    
+    # Contenu structuré pour LLMs
+    findings["has_paragraphs"] = len(soup.find_all("p")) >= 3
+    
+    # Détection de contenu comparatif/contexte
+    comparison_keywords = ["vs", "versus", "comparaison", "compare", "difference", "meilleur", "top"]
+    findings["has_comparison"] = any(kw in text for kw in comparison_keywords)
+    
+    usage_keywords = ["utilisation", "usage", "comment utiliser", "mode d'emploi", "guide", "tutoriel"]
+    findings["has_usage_guide"] = any(kw in text for kw in usage_keywords)
+    
+    specs_keywords = ["caractéristiques", "spécifications", "specs", "techniques", "dimensions", "poids", "matière"]
+    findings["has_specs"] = any(kw in text for kw in specs_keywords)
+    
+    return findings
+
+def analyze_authority_signals(soup, text) -> dict:
+    """Analyse les signaux d'autorité et crédibilité"""
+    findings = {}
+    
+    # Informations sur l'auteur/marque
+    findings["has_author"] = bool(soup.find(attrs={"rel": "author"})) or "par " in text.lower()
+    
+    # Dates de publication/mise à jour
+    time_tags = soup.find_all("time")
+    findings["has_publish_date"] = len(time_tags) > 0
+    
+    # Certifications et garanties
+    cert_keywords = ["certifié", "certification", "norme", "garantie", "warranty", "iso", "ce"]
+    findings["has_certifications"] = any(kw in text for kw in cert_keywords)
+    
+    # Informations contact/entreprise
+    contact_keywords = ["contact", "téléphone", "email", "adresse", "siret"]
+    findings["has_contact_info"] = any(kw in text for kw in contact_keywords)
+    
+    # Liens externes/sources
+    external_links = soup.find_all("a", href=True)
+    findings["has_external_links"] = any(link.get("rel") == ["nofollow"] for link in external_links)
+    
+    return findings
+
+def analyze_metadata(soup) -> dict:
+    """Analyse les métadonnées de la page"""
+    findings = {}
+    
+    # Meta description
+    meta_desc = soup.find("meta", attrs={"name": "description"})
+    findings["has_meta_description"] = meta_desc is not None and len(meta_desc.get("content", "")) > 50
+    
+    # Open Graph
+    og_tags = soup.find_all("meta", attrs={"property": lambda x: x and x.startswith("og:")})
+    findings["has_open_graph"] = len(og_tags) >= 3
+    
+    # Twitter Cards
+    twitter_tags = soup.find_all("meta", attrs={"name": lambda x: x and x.startswith("twitter:")})
+    findings["has_twitter_cards"] = len(twitter_tags) >= 2
+    
+    # Title tag
+    title = soup.find("title")
+    findings["has_title"] = title is not None and 30 <= len(title.text) <= 70
+    
+    # Canonical
+    findings["has_canonical"] = soup.find("link", attrs={"rel": "canonical"}) is not None
+    
+    return findings
+
+def analyze_faq_schema(jsonlds: list[dict]) -> dict:
+    """Analyse la présence et qualité du schema FAQPage"""
+    faq_schemas = [d for d in jsonlds if d.get("@type") == "FAQPage"]
+    
+    if not faq_schemas:
+        return {"found": False, "question_count": 0}
+    
+    faq = faq_schemas[0]
+    questions = faq.get("mainEntity", [])
+    
+    return {
+        "found": True,
+        "question_count": len(questions) if isinstance(questions, list) else 1,
+        "well_structured": len(questions) >= 5 if isinstance(questions, list) else False
+    }
+
 def score_page(html: str) -> dict:
-    """Analyse une page HTML et calcule un score de qualité"""
+    """Analyse approfondie orientée GEO/LLM avec scoring par catégorie"""
     soup = BeautifulSoup(html, "lxml")
     text = soup.get_text(" ", strip=True).lower()
     
+    # Extraction des données structurées
     jsonlds = extract_jsonld(html)
-    product_schema = has_product_schema(jsonlds)
     
-    # Détection des éléments clés
-    findings = {
-        "has_jsonld": len(jsonlds) > 0,
-        "has_product_schema": product_schema,
-        "has_specs_table": bool(soup.select("table")),
-        "mentions_reviews": any(k in text for k in ["avis", "reviews", "étoiles", "note", "rating"]),
-        "has_faq": any(k in text for k in ["faq", "questions fréquentes", "questions frequentes", "frequently asked"]),
-        "has_many_images": len(soup.select("img")) >= 3,
-    }
+    # === ANALYSE PAR CATÉGORIE ===
     
-    # Calcul du score (sur 100)
-    weights = {
-        "has_product_schema": 40,
-        "has_jsonld": 10,
-        "has_specs_table": 15,
-        "mentions_reviews": 15,
-        "has_faq": 10,
-        "has_many_images": 10,
-    }
+    # 1. DONNÉES STRUCTURÉES (40 points max)
+    schema_analysis = analyze_schema_completeness(jsonlds)
+    faq_analysis = analyze_faq_schema(jsonlds)
     
-    score = sum(w for k, w in weights.items() if findings.get(k))
+    structured_data_score = 0
+    structured_data_findings = {}
     
-    # Génération des recommandations
-    recos = []
-    if not findings["has_product_schema"]:
-        recos.append("🔴 Ajouter JSON-LD schema.org Product + Offer (prix, devise, stock, GTIN/SKU)")
-    if not findings["has_specs_table"]:
-        recos.append("🟡 Ajouter un tableau de spécifications (matière, poids, dimensions, normes)")
-    if not findings["has_faq"]:
-        recos.append("🟡 Ajouter une FAQ produit (8-15 Q/R) + balisage FAQPage")
-    if not findings["mentions_reviews"]:
-        recos.append("🟠 Ajouter des avis clients (note, volume, verbatim) + AggregateRating")
-    if not findings["has_many_images"]:
-        recos.append("🟢 Ajouter plus d'images (packshot, détails, contexte) avec alt descriptifs")
+    if schema_analysis["found"]:
+        structured_data_score += int(schema_analysis["completeness"] * 0.25)  # Max 25 points
+        structured_data_findings["product_schema_completeness"] = schema_analysis["completeness"]
+    
+    if faq_analysis["found"]:
+        structured_data_score += 10 if faq_analysis["well_structured"] else 5
+        structured_data_findings["faq_questions"] = faq_analysis["question_count"]
+    
+    # Autres schemas utiles
+    has_breadcrumb = any(d.get("@type") == "BreadcrumbList" for d in jsonlds)
+    if has_breadcrumb:
+        structured_data_score += 5
+        
+    structured_data_findings["has_product_schema"] = schema_analysis["found"]
+    structured_data_findings["has_faq_schema"] = faq_analysis["found"]
+    structured_data_findings["has_breadcrumb"] = has_breadcrumb
+    
+    # 2. QUALITÉ DU CONTENU (30 points max)
+    content_quality = analyze_content_quality(soup, text)
+    
+    content_score = 0
+    if content_quality["sufficient_content"]:
+        content_score += 10
+    if content_quality["has_h1"] and content_quality["has_hierarchy"]:
+        content_score += 5
+    if content_quality["has_lists"]:
+        content_score += 3
+    if content_quality["has_tables"]:
+        content_score += 5
+    if content_quality["has_comparison"]:
+        content_score += 3
+    if content_quality["has_usage_guide"]:
+        content_score += 2
+    if content_quality["has_specs"]:
+        content_score += 2
+    
+    # 3. AUTORITÉ & CRÉDIBILITÉ (15 points max)
+    authority = analyze_authority_signals(soup, text)
+    
+    authority_score = 0
+    if authority["has_author"]:
+        authority_score += 3
+    if authority["has_publish_date"]:
+        authority_score += 3
+    if authority["has_certifications"]:
+        authority_score += 5
+    if authority["has_contact_info"]:
+        authority_score += 4
+    
+    # 4. MÉTADONNÉES (15 points max)
+    metadata = analyze_metadata(soup)
+    
+    metadata_score = 0
+    if metadata["has_meta_description"]:
+        metadata_score += 5
+    if metadata["has_open_graph"]:
+        metadata_score += 4
+    if metadata["has_twitter_cards"]:
+        metadata_score += 2
+    if metadata["has_title"]:
+        metadata_score += 2
+    if metadata["has_canonical"]:
+        metadata_score += 2
+    
+    # SCORE TOTAL (100 points max)
+    total_score = structured_data_score + content_score + authority_score + metadata_score
+    
+    # === GÉNÉRATION DES RECOMMANDATIONS PRIORISÉES ===
+    recommendations = []
+    
+    # Recommandations critiques (impact élevé sur LLMs)
+    if not schema_analysis["found"]:
+        recommendations.append({
+            "priority": "🔴 CRITIQUE",
+            "category": "Données Structurées",
+            "text": "Ajouter schema.org Product complet avec name, description, image, brand, offers (prix + devise + disponibilité)",
+            "impact": "Très élevé - Les LLMs s'appuient massivement sur ces données"
+        })
+    elif schema_analysis["completeness"] < 70:
+        recommendations.append({
+            "priority": "🔴 CRITIQUE", 
+            "category": "Données Structurées",
+            "text": f"Compléter le schema Product (complétude: {schema_analysis['completeness']}%). Manquants: {', '.join(schema_analysis['missing'][:3])}",
+            "impact": "Très élevé"
+        })
+    
+    if not content_quality["sufficient_content"]:
+        recommendations.append({
+            "priority": "🔴 CRITIQUE",
+            "category": "Contenu",
+            "text": f"Enrichir le contenu ({content_quality['word_count']} mots actuellement, minimum 300-500 mots recommandé)",
+            "impact": "Très élevé - Les LLMs ont besoin de contexte"
+        })
+    
+    # Recommandations importantes
+    if not faq_analysis["found"] or not faq_analysis["well_structured"]:
+        recommendations.append({
+            "priority": "🟠 IMPORTANT",
+            "category": "Données Structurées",
+            "text": "Ajouter une FAQ structurée (minimum 8-12 questions) avec schema FAQPage",
+            "impact": "Élevé - Les LLMs adorent les Q&R structurées"
+        })
+    
+    if not content_quality["has_tables"] and not content_quality["has_specs"]:
+        recommendations.append({
+            "priority": "🟠 IMPORTANT",
+            "category": "Contenu",
+            "text": "Ajouter un tableau de spécifications techniques détaillé (dimensions, matériaux, normes, poids, etc.)",
+            "impact": "Élevé - Facilite les comparaisons par les LLMs"
+        })
+    
+    if not content_quality["has_hierarchy"]:
+        recommendations.append({
+            "priority": "🟠 IMPORTANT",
+            "category": "Contenu",
+            "text": "Structurer le contenu avec des titres H2/H3 (ex: Caractéristiques, Utilisation, Avantages)",
+            "impact": "Élevé - Aide les LLMs à comprendre la structure"
+        })
+    
+    if not metadata["has_meta_description"]:
+        recommendations.append({
+            "priority": "🟠 IMPORTANT",
+            "category": "Métadonnées",
+            "text": "Ajouter une meta description concise (150-160 caractères) avec les infos clés du produit",
+            "impact": "Élevé"
+        })
+    
+    # Recommandations recommandées
+    if not authority["has_certifications"]:
+        recommendations.append({
+            "priority": "🟡 RECOMMANDÉ",
+            "category": "Autorité",
+            "text": "Mentionner les certifications, normes, garanties (ISO, CE, garantie 2 ans, etc.)",
+            "impact": "Moyen - Renforce la crédibilité"
+        })
+    
+    if not content_quality["has_comparison"]:
+        recommendations.append({
+            "priority": "🟡 RECOMMANDÉ",
+            "category": "Contenu",
+            "text": "Ajouter une section comparative (vs produits similaires, cas d'usage différents)",
+            "impact": "Moyen - Aide aux recommandations contextuelles"
+        })
+    
+    if not has_breadcrumb:
+        recommendations.append({
+            "priority": "🟡 RECOMMANDÉ",
+            "category": "Données Structurées",
+            "text": "Ajouter un fil d'Ariane avec schema BreadcrumbList",
+            "impact": "Moyen - Contexte de navigation"
+        })
+    
+    if not authority["has_author"] or not authority["has_publish_date"]:
+        recommendations.append({
+            "priority": "🟡 RECOMMANDÉ",
+            "category": "Autorité",
+            "text": "Indiquer la date de publication/mise à jour et l'auteur/source",
+            "impact": "Moyen - Indicateur de fraîcheur"
+        })
+    
+    # Bonus
+    if content_quality["has_lists"]:
+        recommendations.append({
+            "priority": "🟢 BONUS",
+            "category": "Contenu",
+            "text": "Continuer à utiliser des listes à puces - excellent pour la lisibilité par LLMs",
+            "impact": "Faible - Déjà bien fait"
+        })
+    
+    if not content_quality["has_usage_guide"]:
+        recommendations.append({
+            "priority": "🟢 BONUS",
+            "category": "Contenu",
+            "text": "Ajouter un guide d'utilisation ou mode d'emploi",
+            "impact": "Faible - Enrichissement contextuel"
+        })
+    
+    if not metadata["has_open_graph"]:
+        recommendations.append({
+            "priority": "🟢 BONUS",
+            "category": "Métadonnées",
+            "text": "Ajouter les balises Open Graph (og:title, og:description, og:image)",
+            "impact": "Faible - Meilleur partage social"
+        })
     
     return {
-        "score": score,
-        "findings": findings,
-        "recommendations": recos
+        "score": total_score,
+        "score_breakdown": {
+            "structured_data": structured_data_score,
+            "content_quality": content_score,
+            "authority": authority_score,
+            "metadata": metadata_score
+        },
+        "findings": {
+            "structured_data": structured_data_findings,
+            "content_quality": content_quality,
+            "authority": authority,
+            "metadata": metadata
+        },
+        "recommendations": recommendations,
+        "schema_analysis": schema_analysis
     }
 
 async def run_audit(root_url: str, max_pages: int, include_pattern: str, 
@@ -458,17 +813,23 @@ if "results" in st.session_state and st.session_state.results:
                 "URL": r["url"],
                 "Type": r["type"],
                 "Status": r["status"],
-                "Score": r["score"],
-                "Recommendations": " | ".join(r["recommendations"])
+                "Score Total": r["score"],
+                "Score Données Structurées": r.get("score_breakdown", {}).get("structured_data", 0),
+                "Score Contenu": r.get("score_breakdown", {}).get("content_quality", 0),
+                "Score Autorité": r.get("score_breakdown", {}).get("authority", 0),
+                "Score Métadonnées": r.get("score_breakdown", {}).get("metadata", 0),
+                "Nombre Recommandations": len(r["recommendations"]),
+                "Recommandations Critiques": len([rec for rec in r["recommendations"] if "CRITIQUE" in rec.get("priority", "")]),
+                "Top 3 Recommandations": " | ".join([rec.get("text", rec) if isinstance(rec, dict) else rec for rec in r["recommendations"][:3]])
             }
             for r in filtered_results
         ])
         
         csv = df_export.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Télécharger le CSV",
+            label="📥 Télécharger le rapport CSV",
             data=csv,
-            file_name=f"audit_{urlparse(st.session_state.root_url).netloc}_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"audit_geo_{urlparse(st.session_state.root_url).netloc}_{time.strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
     
@@ -476,31 +837,103 @@ if "results" in st.session_state and st.session_state.results:
     
     # Tableau des résultats
     for i, r in enumerate(filtered_results):
+        # Déterminer la couleur du score
+        score_color = "🟢" if r['score'] >= 70 else "🟡" if r['score'] >= 40 else "🔴"
+        score_emoji = "🛍️" if r['type'] == 'product' else "📄"
+        
         with st.expander(
-            f"{'🛍️' if r['type'] == 'product' else '📄'} "
-            f"**Score: {r['score']}/100** - {r['url'][:80]}{'...' if len(r['url']) > 80 else ''}",
-            expanded=(i < 5)  # Affiche les 5 premiers
+            f"{score_emoji} **Score: {score_color} {r['score']}/100** - {r['url'][:70]}{'...' if len(r['url']) > 70 else ''}",
+            expanded=(i < 3)  # Affiche les 3 premiers
         ):
-            col1, col2, col3 = st.columns([2, 1, 1])
+            # En-tête avec URL et statut
+            col1, col2 = st.columns([3, 1])
             
             with col1:
-                st.caption("🔗 URL complète")
+                st.caption("🔗 URL")
                 st.code(r["url"], language=None)
             
             with col2:
-                st.caption("📊 Détails")
+                st.caption("📊 Statut")
                 st.write(f"**Type:** {r['type']}")
-                st.write(f"**Status:** {r['status']}")
-                
-            with col3:
-                st.caption("🎯 Score")
-                score_color = "🟢" if r['score'] >= 70 else "🟡" if r['score'] >= 40 else "🔴"
-                st.write(f"{score_color} **{r['score']}/100**")
+                st.write(f"**HTTP:** {r['status']}")
             
+            # Scores par catégorie (si disponibles)
+            if "score_breakdown" in r:
+                st.markdown("---")
+                st.subheader("📊 Score détaillé par catégorie")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                breakdown = r["score_breakdown"]
+                
+                with col1:
+                    st.metric(
+                        "🔢 Données Structurées",
+                        f"{breakdown['structured_data']}/40",
+                        help="Schema.org Product, FAQ, Breadcrumb"
+                    )
+                
+                with col2:
+                    st.metric(
+                        "📝 Qualité Contenu", 
+                        f"{breakdown['content_quality']}/30",
+                        help="Longueur, structure, tableaux, listes"
+                    )
+                
+                with col3:
+                    st.metric(
+                        "🏆 Autorité",
+                        f"{breakdown['authority']}/15",
+                        help="Certifications, auteur, dates"
+                    )
+                
+                with col4:
+                    st.metric(
+                        "🏷️ Métadonnées",
+                        f"{breakdown['metadata']}/15",
+                        help="Meta description, Open Graph, Title"
+                    )
+            
+            # Recommandations priorisées
             if r["recommendations"]:
-                st.caption("💡 Recommandations")
-                for reco in r["recommendations"]:
-                    st.markdown(f"- {reco}")
+                st.markdown("---")
+                st.subheader("💡 Recommandations GEO (Optimisation LLM)")
+                
+                # Grouper par priorité
+                critiques = [rec for rec in r["recommendations"] if "CRITIQUE" in rec.get("priority", "")]
+                importantes = [rec for rec in r["recommendations"] if "IMPORTANT" in rec.get("priority", "")]
+                recommandees = [rec for rec in r["recommendations"] if "RECOMMANDÉ" in rec.get("priority", "")]
+                bonus = [rec for rec in r["recommendations"] if "BONUS" in rec.get("priority", "")]
+                
+                # Afficher par priorité
+                if critiques:
+                    st.markdown("##### 🔴 Actions Critiques (à faire en priorité)")
+                    for rec in critiques:
+                        with st.container():
+                            st.markdown(f"**{rec['category']}** - {rec['text']}")
+                            st.caption(f"💥 Impact: {rec['impact']}")
+                
+                if importantes:
+                    st.markdown("##### 🟠 Actions Importantes")
+                    for rec in importantes:
+                        with st.container():
+                            st.markdown(f"**{rec['category']}** - {rec['text']}")
+                            st.caption(f"📈 Impact: {rec['impact']}")
+                
+                if recommandees:
+                    with st.expander("🟡 Actions Recommandées (cliquez pour voir)", expanded=False):
+                        for rec in recommandees:
+                            st.markdown(f"**{rec['category']}** - {rec['text']}")
+                            st.caption(f"Impact: {rec['impact']}")
+                
+                if bonus:
+                    with st.expander("🟢 Améliorations Bonus", expanded=False):
+                        for rec in bonus:
+                            st.markdown(f"**{rec['category']}** - {rec['text']}")
+            
+            # Détails techniques (expandable)
+            if "findings" in r:
+                with st.expander("🔧 Détails techniques", expanded=False):
+                    st.json(r["findings"])
 else:
     st.info("👆 Entrez une URL et lancez un scan pour commencer l'audit")
 
@@ -508,7 +941,8 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
-    <p>🔍 <strong>LLM Product Page Auditor</strong> - Optimisez vos pages produits pour le SEO e-commerce</p>
-    <p style='font-size: 0.9em;'>Détection automatique de schema.org, scoring intelligent et recommandations actionnables</p>
+    <p>🔍 <strong>LLM Product Page Auditor</strong> - Optimisation GEO pour les moteurs IA génératifs</p>
+    <p style='font-size: 0.9em;'>Analyse approfondie orientée LLMs : données structurées complètes, contenu riche, signaux d'autorité et métadonnées optimisées</p>
+    <p style='font-size: 0.8em; margin-top: 10px;'>💡 GEO = Generative Engine Optimization - Le nouveau SEO pour ChatGPT, Claude, Perplexity & co.</p>
 </div>
 """, unsafe_allow_html=True)
