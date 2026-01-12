@@ -117,6 +117,14 @@ async def discover_urls(root_url: str, progress_bar) -> list[str]:
             progress_bar.progress(0.1, text="🔍 Recherche du sitemap...")
             xml = await fetch_text(client, sitemap_url)
             locs = SITEMAP_RE.findall(xml)
+            
+            # Nettoyer les balises CDATA des URLs
+            def clean_url(url):
+                """Nettoie les balises XML comme <![CDATA[ et ]]>"""
+                url = url.replace('<![CDATA[', '').replace(']]>', '').strip()
+                return url
+            
+            locs = [clean_url(loc) for loc in locs]
             urls = []
             
             # Gestion des sitemap index (multiples sitemaps)
@@ -127,7 +135,9 @@ async def discover_urls(root_url: str, progress_bar) -> list[str]:
                 for i, sitemap_file in enumerate(sitemap_files):
                     try:
                         subxml = await fetch_text(client, sitemap_file)
-                        urls.extend(SITEMAP_RE.findall(subxml))
+                        sub_locs = SITEMAP_RE.findall(subxml)
+                        sub_locs = [clean_url(loc) for loc in sub_locs]
+                        urls.extend(sub_locs)
                         progress_bar.progress(0.2 + (i+1)/len(sitemap_files) * 0.2, 
                                             text=f"📄 Lecture sitemap {i+1}/{len(sitemap_files)}...")
                     except Exception:
