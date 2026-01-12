@@ -134,6 +134,10 @@ def extract_categories_from_urls(urls: list[str], base_domain: str) -> dict:
     
     categories = []
     
+    # Segments génériques à ignorer (on prendra le segment suivant)
+    generic_segments = ['content', 'products', 'produits', 'shop', 'boutique', 
+                       'catalog', 'catalogue', 'collections', 'items', 'pages']
+    
     for url in urls:
         parsed = urlparse(url)
         
@@ -142,23 +146,37 @@ def extract_categories_from_urls(urls: list[str], base_domain: str) -> dict:
         if not path:
             continue
             
-        segments = path.split('/')
+        segments = [s for s in path.split('/') if s]  # Filtrer les segments vides
         
-        # Prendre le premier segment comme catégorie
-        # Ex: /vetements/pantalons/... -> "vetements"
-        if segments and segments[0]:
+        if not segments:
+            continue
+        
+        # Déterminer quel segment utiliser
+        category = None
+        
+        # Si le premier segment est générique, prendre le deuxième
+        if len(segments) >= 2 and segments[0].lower() in generic_segments:
+            category = segments[1]
+        # Sinon prendre le premier
+        elif len(segments) >= 1:
             category = segments[0]
+        
+        if category:
             # Filtrer les catégories techniques communes
             excluded = ['sitemap', 'index', 'page', 'wp-content', 'admin', 'api', 
                        'wp-json', 'feed', 'author', 'tag', 'category', 'search',
-                       'cart', 'checkout', 'account', 'login', 'register']
-            if category not in excluded and not category.startswith('wp-'):
+                       'cart', 'checkout', 'account', 'login', 'register', 'contact',
+                       'about', 'mentions-legales', 'cgv', 'cgu', 'privacy']
+            
+            # Exclure aussi les segments qui ressemblent à des IDs numériques purs
+            if category.lower() not in excluded and not category.isdigit():
                 categories.append(category)
     
     # Compter les occurrences
     category_counts = Counter(categories)
     
     # Retourner seulement les catégories avec au moins 3 URLs (plus significatif)
+    # Trier par nombre d'URLs décroissant
     return dict(sorted(
         [(cat, count) for cat, count in category_counts.items() if count >= 3],
         key=lambda x: x[1],
@@ -175,16 +193,31 @@ def filter_urls_by_categories(urls: list[str], selected_categories: list[str]) -
     
     filtered = []
     
+    # Segments génériques (on vérifiera le segment suivant)
+    generic_segments = ['content', 'products', 'produits', 'shop', 'boutique', 
+                       'catalog', 'catalogue', 'collections', 'items', 'pages']
+    
     for url in urls:
         parsed = urlparse(url)
         path = parsed.path.strip('/')
         if not path:
             continue
             
-        segments = path.split('/')
+        segments = [s for s in path.split('/') if s]
         
-        # Vérifier si le premier segment correspond à une catégorie sélectionnée
-        if segments and segments[0] in selected_categories:
+        if not segments:
+            continue
+        
+        # Déterminer quel segment vérifier
+        category_segment = None
+        
+        if len(segments) >= 2 and segments[0].lower() in generic_segments:
+            category_segment = segments[1]
+        elif len(segments) >= 1:
+            category_segment = segments[0]
+        
+        # Vérifier si le segment correspond à une catégorie sélectionnée
+        if category_segment and category_segment in selected_categories:
             filtered.append(url)
     
     return filtered
@@ -802,6 +835,13 @@ if detect_categories_btn and root_url:
             urls = asyncio.run(discover_urls(root_url, temp_progress))
             temp_progress.empty()
             
+            # Afficher un échantillon d'URLs pour debug
+            with st.expander("🔍 Échantillon d'URLs détectées (pour debug)", expanded=False):
+                sample_urls = urls[:10] if urls else []
+                for url in sample_urls:
+                    st.code(url, language=None)
+                st.caption(f"Total : {len(urls)} URLs dans le sitemap")
+            
             # Extraire les catégories
             parsed = urlparse(root_url)
             base_domain = parsed.netloc
@@ -810,10 +850,29 @@ if detect_categories_btn and root_url:
             if categories_dict:
                 st.session_state.categories = categories_dict
                 st.session_state.discovered_urls = urls
+                
+                # Message de succès avec détails
                 st.success(f"✅ {len(categories_dict)} catégorie(s) détectée(s) dans {len(urls)} URLs")
+                
+                # Afficher un aperçu des catégories détectées
+                with st.expander("📁 Aperçu des catégories détectées", expanded=True):
+                    for cat, count in list(categories_dict.items())[:10]:
+                        st.write(f"• **{cat}** : {count} URLs")
+                    if len(categories_dict) > 10:
+                        st.caption(f"... et {len(categories_dict) - 10} autre(s) catégorie(s)")
+                
                 st.rerun()
             else:
-                st.warning("⚠️ Aucune catégorie détectée. Les URLs seront toutes analysées.")
+                st.warning("⚠️ Aucune catégorie détectée automatiquement.")
+                st.info("""
+                **Pourquoi ?**
+                - Le site n'a peut-être pas de structure de catégories claire dans les URLs
+                - Les URLs utilisent peut-être des IDs numériques plutôt que des noms
+                
+                **Solutions** :
+                - Utilisez les filtres templates (Shopify, PrestaShop, etc.) dans la sidebar
+                - Ou scannez directement une URL de page produit
+                """)
                 st.session_state.categories = {}
         except Exception as e:
             st.error(f"❌ Erreur lors de la détection : {str(e)}")
