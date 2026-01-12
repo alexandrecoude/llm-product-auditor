@@ -127,75 +127,63 @@ async def fetch_text(client: httpx.AsyncClient, url: str) -> str:
 
 def extract_categories_from_urls(urls: list[str], base_domain: str) -> dict:
     """
-    Extrait les catégories des URLs basées sur les segments de path.
-    Retourne un dict avec {categorie: nombre_urls}
+    Extrait TOUTES les catégories sans filtre strict.
+    Affiche tout pour debug.
     """
     from collections import Counter
     
-    categories = []
+    level1_categories = []
+    level2_categories = []
+    all_segments_debug = []
     
-    # Segments génériques à ignorer (on prendra le segment suivant)
-    generic_segments = ['content', 'products', 'produits', 'shop', 'boutique', 
-                       'catalog', 'catalogue', 'collections', 'items', 'pages']
+    # Segments techniques à exclure (liste minimale)
+    excluded = ['sitemap', 'wp-content', 'wp-json', 'admin', 'api']
     
     for url in urls:
         parsed = urlparse(url)
-        
-        # Extraire les segments du path
         path = parsed.path.strip('/')
+        
         if not path:
             continue
             
-        segments = [s for s in path.split('/') if s]  # Filtrer les segments vides
+        # Découper en segments
+        segments = [s for s in path.split('/') if s]
         
-        if not segments:
-            continue
+        # Garder TOUS les segments pour debug (pas de filtre)
+        if len(segments) > 0:
+            all_segments_debug.append((url, segments))
         
-        # Déterminer quel segment utiliser
-        category = None
+        # Extraire niveau 1 (premier segment non exclu)
+        for seg in segments:
+            if seg.lower() not in excluded:
+                level1_categories.append(seg)
+                break
         
-        # Si le premier segment est générique, prendre le deuxième
-        if len(segments) >= 2 and segments[0].lower() in generic_segments:
-            category = segments[1]
-        # Sinon prendre le premier
-        elif len(segments) >= 1:
-            category = segments[0]
-        
-        if category:
-            # Filtrer les catégories techniques communes
-            excluded = ['sitemap', 'index', 'page', 'wp-content', 'admin', 'api', 
-                       'wp-json', 'feed', 'author', 'tag', 'category', 'search',
-                       'cart', 'checkout', 'account', 'login', 'register', 'contact',
-                       'about', 'mentions-legales', 'cgv', 'cgu', 'privacy']
-            
-            # Exclure aussi les segments qui ressemblent à des IDs numériques purs
-            if category.lower() not in excluded and not category.isdigit():
-                categories.append(category)
+        # Extraire niveau 2 (2 premiers segments)
+        valid_segs = [s for s in segments if s.lower() not in excluded]
+        if len(valid_segs) >= 2:
+            level2_categories.append(f"{valid_segs[0]}/{valid_segs[1]}")
     
-    # Compter les occurrences
-    category_counts = Counter(categories)
+    # Compter TOUT (même les catégories avec 1 seule URL)
+    level1_counts = Counter(level1_categories)
+    level2_counts = Counter(level2_categories)
     
-    # Retourner seulement les catégories avec au moins 3 URLs (plus significatif)
-    # Trier par nombre d'URLs décroissant
-    return dict(sorted(
-        [(cat, count) for cat, count in category_counts.items() if count >= 3],
-        key=lambda x: x[1],
-        reverse=True
-    ))
+    return {
+        'level1': dict(sorted(level1_counts.items(), key=lambda x: x[1], reverse=True)),
+        'level2': dict(sorted(level2_counts.items(), key=lambda x: x[1], reverse=True)),
+        'all_segments': all_segments_debug[:50],  # 50 exemples pour debug
+        'total_urls': len(urls)
+    }
 
-def filter_urls_by_categories(urls: list[str], selected_categories: list[str]) -> list[str]:
+def filter_urls_by_categories(urls: list[str], selected_categories: list[str], level: str = 'level1') -> list[str]:
     """
-    Filtre les URLs pour ne garder que celles des catégories sélectionnées.
-    Si selected_categories est vide, retourne toutes les URLs.
+    Filtre simple par catégories.
     """
     if not selected_categories or "Toutes les catégories" in selected_categories:
         return urls
     
     filtered = []
-    
-    # Segments génériques (on vérifiera le segment suivant)
-    generic_segments = ['content', 'products', 'produits', 'shop', 'boutique', 
-                       'catalog', 'catalogue', 'collections', 'items', 'pages']
+    excluded = ['sitemap', 'wp-content', 'wp-json', 'admin', 'api']
     
     for url in urls:
         parsed = urlparse(url)
@@ -203,22 +191,16 @@ def filter_urls_by_categories(urls: list[str], selected_categories: list[str]) -
         if not path:
             continue
             
-        segments = [s for s in path.split('/') if s]
+        segments = [s for s in path.split('/') if s and s.lower() not in excluded]
         
-        if not segments:
-            continue
+        if level == 'level1' and len(segments) >= 1:
+            if segments[0] in selected_categories:
+                filtered.append(url)
         
-        # Déterminer quel segment vérifier
-        category_segment = None
-        
-        if len(segments) >= 2 and segments[0].lower() in generic_segments:
-            category_segment = segments[1]
-        elif len(segments) >= 1:
-            category_segment = segments[0]
-        
-        # Vérifier si le segment correspond à une catégorie sélectionnée
-        if category_segment and category_segment in selected_categories:
-            filtered.append(url)
+        elif level == 'level2' and len(segments) >= 2:
+            full_cat = f"{segments[0]}/{segments[1]}"
+            if full_cat in selected_categories:
+                filtered.append(url)
     
     return filtered
 
@@ -677,7 +659,7 @@ def score_page(html: str) -> dict:
     }
 
 async def run_audit(root_url: str, max_pages: int, include_pattern: str, 
-                   exclude_patterns: list, progress_bar, status_text, selected_categories: list = None):
+                   exclude_patterns: list, progress_bar, status_text, selected_categories: list = None, category_level: str = 'level1'):
     """Lance l'audit complet du site"""
     
     # Découverte des URLs
@@ -695,9 +677,9 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     # NOUVEAU : Filtrage par catégories si sélectionnées
     urls_after_categories = urls_after_domain
     if selected_categories and "Toutes les catégories" not in selected_categories:
-        urls = filter_urls_by_categories(urls, selected_categories)
+        urls = filter_urls_by_categories(urls, selected_categories, category_level)
         urls_after_categories = len(urls)
-        status_text.text(f"📁 Filtrage par catégories : {urls_after_domain} → {urls_after_categories} URLs")
+        status_text.text(f"📁 Filtrage par catégories ({category_level}) : {urls_after_domain} → {urls_after_categories} URLs")
     
     # Debug : pourquoi certaines URLs sont rejetées
     rejected_by_domain = []
@@ -835,75 +817,163 @@ if detect_categories_btn and root_url:
             urls = asyncio.run(discover_urls(root_url, temp_progress))
             temp_progress.empty()
             
-            # Afficher un échantillon d'URLs pour debug
-            with st.expander("🔍 Échantillon d'URLs détectées (pour debug)", expanded=False):
-                sample_urls = urls[:10] if urls else []
-                for url in sample_urls:
-                    st.code(url, language=None)
-                st.caption(f"Total : {len(urls)} URLs dans le sitemap")
-            
-            # Extraire les catégories
+            # Extraire les catégories (multi-niveaux)
             parsed = urlparse(root_url)
             base_domain = parsed.netloc
-            categories_dict = extract_categories_from_urls(urls, base_domain)
+            categories_result = extract_categories_from_urls(urls, base_domain)
             
-            if categories_dict:
-                st.session_state.categories = categories_dict
+            level1_cats = categories_result['level1']
+            level2_cats = categories_result['level2']
+            all_segments = categories_result['all_segments']
+            
+            # TOUJOURS AFFICHER LE DEBUG (même si pas de catégories)
+            st.success(f"✅ Analyse terminée : {len(urls)} URLs trouvées")
+            
+            with st.expander("🔍 DEBUG COMPLET - Voir la structure des URLs", expanded=True):
+                st.markdown("### 📋 Échantillon d'URLs avec leurs segments")
+                st.caption("Regardez la structure pour comprendre comment vos URLs sont organisées")
+                
+                for i, (url, segments) in enumerate(all_segments[:20], 1):
+                    st.markdown(f"**URL {i}:**")
+                    st.code(url, language=None)
+                    st.write(f"→ **Segments:** {' / '.join(segments)}")
+                    if len(segments) >= 1:
+                        st.info(f"**Niveau 1:** `{segments[0]}`")
+                    if len(segments) >= 2:
+                        st.info(f"**Niveau 2:** `{segments[0]}/{segments[1]}`")
+                    st.markdown("---")
+                
+                if len(all_segments) > 20:
+                    st.caption(f"... et {len(all_segments) - 20} autres URLs dans le sitemap")
+            
+            # Afficher les catégories détectées
+            if level1_cats or level2_cats:
+                with st.expander("📁 Catégories détectées", expanded=True):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### Niveau 1 (premier segment)")
+                        if level1_cats:
+                            for cat, count in list(level1_cats.items())[:20]:
+                                st.write(f"• **{cat}** : {count} URLs")
+                            if len(level1_cats) > 20:
+                                st.caption(f"... et {len(level1_cats) - 20} autre(s)")
+                        else:
+                            st.warning("Aucune catégorie niveau 1")
+                    
+                    with col2:
+                        st.markdown("#### Niveau 2 (deux premiers segments)")
+                        if level2_cats:
+                            for cat, count in list(level2_cats.items())[:20]:
+                                st.write(f"• **{cat}** : {count} URLs")
+                            if len(level2_cats) > 20:
+                                st.caption(f"... et {len(level2_cats) - 20} autre(s)")
+                        else:
+                            st.warning("Aucune sous-catégorie")
+                
+                # Stocker et continuer
+                st.session_state.categories = categories_result
                 st.session_state.discovered_urls = urls
                 
-                # Message de succès avec détails
-                st.success(f"✅ {len(categories_dict)} catégorie(s) détectée(s) dans {len(urls)} URLs")
-                
-                # Afficher un aperçu des catégories détectées
-                with st.expander("📁 Aperçu des catégories détectées", expanded=True):
-                    for cat, count in list(categories_dict.items())[:10]:
-                        st.write(f"• **{cat}** : {count} URLs")
-                    if len(categories_dict) > 10:
-                        st.caption(f"... et {len(categories_dict) - 10} autre(s) catégorie(s)")
+                st.success(f"✨ **{len(level1_cats)} catégories niveau 1** et **{len(level2_cats)} niveau 2** détectées !")
+                st.info("👇 Sélectionnez les catégories ci-dessous pour filtrer votre scan")
                 
                 st.rerun()
             else:
-                st.warning("⚠️ Aucune catégorie détectée automatiquement.")
-                st.info("""
-                **Pourquoi ?**
-                - Le site n'a peut-être pas de structure de catégories claire dans les URLs
-                - Les URLs utilisent peut-être des IDs numériques plutôt que des noms
+                # Aucune catégorie détectée
+                st.error("❌ Aucune catégorie détectée")
+                st.warning("""
+                **Regardez le DEBUG ci-dessus !**
                 
-                **Solutions** :
-                - Utilisez les filtres templates (Shopify, PrestaShop, etc.) dans la sidebar
-                - Ou scannez directement une URL de page produit
+                Si vous voyez des segments dans les URLs, mais qu'aucune catégorie n'est détectée, 
+                c'est peut-être parce que :
+                - Les segments sont tous exclus (sitemap, wp-content, etc.)
+                - Les URLs n'ont pas de structure cohérente
+                
+                **Solutions alternatives** :
+                1. Utilisez les **filtres templates** dans la sidebar (Shopify, PrestaShop, etc.)
+                2. Utilisez les **patterns personnalisés** dans la sidebar
+                3. Scannez directement une **URL de page produit**
                 """)
                 st.session_state.categories = {}
+                
         except Exception as e:
             st.error(f"❌ Erreur lors de la détection : {str(e)}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
             st.session_state.categories = {}
 
 # Multiselect des catégories si détectées
 selected_categories = []
+category_level = 'level1'
+
 if 'categories' in st.session_state and st.session_state.categories:
+    categories_result = st.session_state.categories
+    level1_cats = categories_result.get('level1', {})
+    level2_cats = categories_result.get('level2', {})
+    
     st.markdown("### 📁 Filtrer par catégories")
     
-    # Afficher les catégories disponibles avec leur nombre d'URLs
-    category_options = ["Toutes les catégories"] + [
-        f"{cat} ({count} URLs)" for cat, count in st.session_state.categories.items()
-    ]
+    # Choix du niveau
+    has_level1 = len(level1_cats) > 0
+    has_level2 = len(level2_cats) > 0
     
-    selected = st.multiselect(
-        "Sélectionnez les catégories à analyser",
-        options=category_options,
-        default=["Toutes les catégories"],
-        help="Choisissez une ou plusieurs catégories pour limiter le scan à ces sections du site"
-    )
+    if has_level1 and has_level2:
+        category_level = st.radio(
+            "Choisissez le niveau de filtrage",
+            options=['level1', 'level2'],
+            format_func=lambda x: f"📁 Catégories principales ({len(level1_cats)})" if x == 'level1' else f"📂 Catégorie + Sous-catégorie ({len(level2_cats)})",
+            horizontal=True
+        )
+    elif has_level1:
+        category_level = 'level1'
+        st.info(f"📁 Mode : Catégories principales ({len(level1_cats)} détectées)")
+    elif has_level2:
+        category_level = 'level2'
+        st.info(f"📂 Mode : Sous-catégories ({len(level2_cats)} détectées)")
     
-    # Extraire les noms de catégories (sans le nombre d'URLs)
-    if "Toutes les catégories" not in selected:
-        selected_categories = [s.split(" (")[0] for s in selected if " (" in s]
-    else:
-        selected_categories = ["Toutes les catégories"]
+    # Afficher les options selon le niveau
+    if category_level == 'level1' and level1_cats:
+        category_options = ["Toutes les catégories"] + [
+            f"{cat} ({count} URLs)" for cat, count in level1_cats.items()
+        ]
+        
+        selected = st.multiselect(
+            "Sélectionnez les catégories à analyser",
+            options=category_options,
+            default=["Toutes les catégories"],
+            help="Choisissez une ou plusieurs catégories pour limiter le scan"
+        )
+        
+        if "Toutes les catégories" not in selected:
+            selected_categories = [s.split(" (")[0] for s in selected if " (" in s]
+        else:
+            selected_categories = ["Toutes les catégories"]
+        
+        if selected_categories and "Toutes les catégories" not in selected_categories:
+            total_urls = sum(level1_cats.get(cat, 0) for cat in selected_categories)
+            st.info(f"📊 **{total_urls} URLs** seront analysées dans les catégories sélectionnées")
     
-    if selected_categories and "Toutes les catégories" not in selected_categories:
-        total_urls = sum(st.session_state.categories[cat] for cat in selected_categories)
-        st.info(f"📊 **{total_urls} URLs** seront analysées dans les catégories sélectionnées")
+    elif category_level == 'level2' and level2_cats:
+        category_options = ["Toutes les catégories"] + [
+            f"{cat} ({count} URLs)" for cat, count in level2_cats.items()
+        ]
+        
+        selected = st.multiselect(
+            "Sélectionnez les sous-catégories à analyser",
+            options=category_options,
+            default=["Toutes les catégories"],
+            help="Choisissez une ou plusieurs sous-catégories pour un ciblage précis"
+        )
+        
+        if "Toutes les catégories" not in selected:
+            selected_categories = [s.split(" (")[0] for s in selected if " (" in s]
+        else:
+            selected_categories = ["Toutes les catégories"]
+        
+        if selected_categories and "Toutes les catégories" not in selected_categories:
+            total_urls = sum(level2_cats.get(cat, 0) for cat in selected_categories)
+            st.info(f"📊 **{total_urls} URLs** seront analysées dans les sous-catégories sélectionnées")
 
 col1, col2 = st.columns([1, 4])
 
@@ -932,9 +1002,11 @@ if scan_button:
     if not root_url:
         st.error("⚠️ Veuillez entrer une URL")
     else:
-        # S'assurer que selected_categories existe
-        if not 'selected_categories' in locals():
+        # S'assurer que selected_categories et category_level existent
+        if 'selected_categories' not in locals():
             selected_categories = []
+        if 'category_level' not in locals():
+            category_level = 'level1'
         
         # Debug : afficher les filtres actifs
         with st.expander("🔧 Debug - Filtres actifs", expanded=False):
@@ -942,7 +1014,7 @@ if scan_button:
             st.write(f"**Pattern d'inclusion** : `{include_pattern if include_pattern else '(aucun)'}`")
             st.write(f"**Patterns d'exclusion** : `{exclude_patterns if exclude_patterns else '(aucun)'}`")
             if selected_categories and "Toutes les catégories" not in selected_categories:
-                st.write(f"**Catégories sélectionnées** : {', '.join(selected_categories)}")
+                st.write(f"**Catégories sélectionnées ({category_level})** : {', '.join(selected_categories)}")
             else:
                 st.write(f"**Catégories** : Toutes (aucun filtre)")
         
@@ -960,7 +1032,8 @@ if scan_button:
                 exclude_patterns,
                 progress_bar,
                 status_text,
-                selected_categories  # Ajout du filtrage par catégories
+                selected_categories,  # Filtrage par catégories
+                category_level  # Niveau de filtrage
             ))
             
             status_text.empty()
