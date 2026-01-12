@@ -355,24 +355,23 @@ if scan_button:
                 st.info("💡 **Suggestions :**")
                 for suggestion in results.get("suggestions", []):
                     st.write(suggestion)
-                return
-            
-            # Stocke les résultats dans la session
-            st.session_state.results = results
-            st.session_state.root_url = root_url
-            
-            # Statistiques globales
-            total = len(results)
-            products = len([r for r in results if r["type"] == "product"])
-            avg_score = sum(r["score"] for r in results) / total if total > 0 else 0
-            
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("📄 Pages analysées", total)
-            col2.metric("🛍️ Pages produits", products)
-            col3.metric("📊 Score moyen", f"{avg_score:.0f}/100")
-            col4.metric("⚠️ Pages à optimiser", len([r for r in results if r["score"] < 70]))
-            
-            st.success(f"✅ Scan terminé ! {total} page(s) analysée(s)")
+            else:
+                # Stocke les résultats dans la session
+                st.session_state.results = results
+                st.session_state.root_url = root_url
+                
+                # Statistiques globales
+                total = len(results)
+                products = len([r for r in results if r["type"] == "product"])
+                avg_score = sum(r["score"] for r in results) / total if total > 0 else 0
+                
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("📄 Pages analysées", total)
+                col2.metric("🛍️ Pages produits", products)
+                col3.metric("📊 Score moyen", f"{avg_score:.0f}/100")
+                col4.metric("⚠️ Pages à optimiser", len([r for r in results if r["score"] < 70]))
+                
+                st.success(f"✅ Scan terminé ! {total} page(s) analysée(s)")
             
         except Exception as e:
             st.error(f"❌ Erreur lors du scan : {str(e)}")
@@ -462,3 +461,4 @@ st.markdown("""
     <p style='font-size: 0.9em;'>Détection automatique de schema.org, scoring intelligent et recommandations actionnables</p>
 </div>
 """, unsafe_allow_html=True)
+Fix: correction erreur syntaxe
