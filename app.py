@@ -461,4 +461,3 @@ st.markdown("""
     <p style='font-size: 0.9em;'>Détection automatique de schema.org, scoring intelligent et recommandations actionnables</p>
 </div>
 """, unsafe_allow_html=True)
-Fix: correction erreur syntaxe
