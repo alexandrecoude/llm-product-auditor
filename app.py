@@ -28,21 +28,32 @@ st.markdown("""
         --accent: #fbbf24;
         --success: #34d399;
         --danger: #f87171;
-        --bg-1: #0f172a;
-        --bg-2: #1e293b;
-        --bg-3: #334155;
-        --text-1: #f1f5f9;
-        --text-2: #cbd5e1;
-        --text-3: #94a3b8;
-        --border: #334155;
-        --shadow: rgba(0,0,0,0.5);
-        --glow: rgba(129,140,248,0.3);
+        --bg-1: #000000;      /* NOIR PUR */
+        --bg-2: #0a0a0a;      /* NOIR TRÈS FONCÉ */
+        --bg-3: #1a1a1a;      /* NOIR FONCÉ */
+        --bg-4: #2a2a2a;      /* GRIS TRÈS FONCÉ */
+        --text-1: #ffffff;
+        --text-2: #d1d5db;
+        --text-3: #9ca3af;
+        --border: #2a2a2a;
+        --shadow: rgba(0,0,0,0.8);
+        --glow: rgba(129,140,248,0.4);
     }
     
     * { font-family: 'Inter', sans-serif !important; }
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] { background: var(--bg-1) !important; }
-    .main { background: var(--bg-1) !important; }
-    .block-container { padding: 3rem 4rem !important; max-width: 1400px !important; margin: 0 auto !important; }
+    
+    /* Background noir partout */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] { 
+        background: var(--bg-1) !important; 
+        color: var(--text-2) !important;
+    }
+    .main { background: var(--bg-1) !important; padding: 0 !important; }
+    .block-container { 
+        padding: 3rem 4rem !important; 
+        max-width: 1400px !important; 
+        margin: 0 auto !important; 
+        background: var(--bg-1) !important;
+    }
     
     /* Titres */
     h1 { 
@@ -54,85 +65,139 @@ st.markdown("""
         margin: 0.5rem 0 !important;
         text-align: center !important;
     }
-    h2 { font-size: 1.875rem !important; font-weight: 700 !important; color: var(--text-1) !important; margin: 2rem 0 1rem !important; }
-    h3 { font-size: 1.5rem !important; font-weight: 600 !important; color: var(--text-1) !important; margin: 1.5rem 0 0.75rem !important; }
-    h4 { font-size: 1.25rem !important; font-weight: 600 !important; color: var(--text-1) !important; margin: 1rem 0 0.5rem !important; }
-    p, span, div, label { color: var(--text-2) !important; }
+    h2 { 
+        font-size: 1.875rem !important; 
+        font-weight: 700 !important; 
+        color: var(--text-1) !important; 
+        margin: 2rem 0 1rem !important; 
+    }
+    h3 { 
+        font-size: 1.5rem !important; 
+        font-weight: 600 !important; 
+        color: var(--text-1) !important; 
+        margin: 1.5rem 0 0.75rem !important; 
+    }
+    h4 { 
+        font-size: 1.25rem !important; 
+        font-weight: 600 !important; 
+        color: var(--text-1) !important; 
+        margin: 1rem 0 0.5rem !important; 
+    }
+    p, span, div:not(.stMarkdown):not(.stExpander), label { color: var(--text-2) !important; }
     
-    /* FIX CRITIQUE: Expanders - padding et line-height corrects */
+    /* ============================================ */
+    /* FIX DEFINITIF EXPANDERS - Plus de chevauchement */
+    /* ============================================ */
     .stExpander { 
         background: var(--bg-2) !important; 
         border: 1px solid var(--border) !important; 
         border-radius: 12px !important; 
-        margin-bottom: 1rem !important;
-        overflow: hidden !important;
+        margin-bottom: 1.25rem !important;
+        overflow: visible !important;  /* Permet débordement si nécessaire */
     }
     
+    /* Le summary (titre cliquable) */
     .stExpander summary {
         background: var(--bg-3) !important;
-        padding: 1.25rem 1.5rem !important;  /* Plus de padding vertical */
-        min-height: 60px !important;  /* Hauteur minimale pour éviter écrasement */
+        padding: 1.5rem 1.75rem !important;  /* ENCORE PLUS de padding */
+        min-height: 70px !important;  /* Hauteur minimum augmentée */
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        font-size: 1rem !important;
         color: var(--text-1) !important;
-        line-height: 1.8 !important;  /* Plus d'espace entre les lignes */
-        display: flex !important;
-        align-items: center !important;
+        line-height: 2 !important;  /* Line-height très généreux */
+        display: block !important;  /* Force block pour éviter collapse */
         cursor: pointer !important;
+        border-radius: 12px 12px 0 0 !important;
+        white-space: normal !important;  /* Permet retour à la ligne */
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
     }
     
     .stExpander summary:hover {
-        background: #3f4b5e !important;
+        background: var(--bg-4) !important;
         transition: background 0.2s ease !important;
     }
     
+    /* Icône d'expansion */
+    .stExpander summary::marker,
+    .stExpander summary::-webkit-details-marker {
+        color: var(--primary) !important;
+        font-size: 1.2rem !important;
+    }
+    
     /* Contenu de l'expander */
+    .stExpander[open] > summary {
+        border-bottom: 1px solid var(--border) !important;
+        margin-bottom: 0 !important;
+    }
+    
     .stExpander > div:not(summary) {
-        padding: 1.5rem !important;
+        padding: 1.75rem !important;
         background: var(--bg-2) !important;
     }
     
+    /* ============================================ */
     /* Boutons */
+    /* ============================================ */
     .stButton > button { 
         background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; 
         color: white !important; 
         border: none !important; 
         border-radius: 12px !important; 
-        padding: 0.75rem 2rem !important; 
+        padding: 0.875rem 2rem !important; 
         font-weight: 600 !important; 
-        box-shadow: 0 4px 6px var(--shadow), 0 0 20px var(--glow) !important;
+        font-size: 1rem !important;
+        box-shadow: 0 4px 6px var(--shadow), 0 0 25px var(--glow) !important;
         transition: all 0.3s ease !important;
     }
-    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px var(--shadow), 0 0 30px var(--glow) !important; }
+    .stButton > button:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 10px 15px var(--shadow), 0 0 40px var(--glow) !important; 
+    }
     
     .stDownloadButton > button {
         background: linear-gradient(135deg, var(--success), #10b981) !important;
-        color: var(--bg-1) !important;
+        color: #000 !important;
         border: none !important;
         border-radius: 12px !important;
-        padding: 0.625rem 1.5rem !important;
+        padding: 0.75rem 1.75rem !important;
         font-weight: 600 !important;
-        box-shadow: 0 4px 6px var(--shadow) !important;
+        box-shadow: 0 4px 6px var(--shadow), 0 0 20px rgba(52,211,153,0.3) !important;
+    }
+    .stDownloadButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px var(--shadow), 0 0 35px rgba(52,211,153,0.4) !important;
     }
     
+    /* ============================================ */
     /* Inputs */
-    .stTextInput input, .stNumberInput input, .stTextArea textarea { 
+    /* ============================================ */
+    .stTextInput input, 
+    .stNumberInput input, 
+    .stTextArea textarea { 
         background: var(--bg-2) !important; 
         border: 2px solid var(--border) !important; 
         border-radius: 12px !important; 
-        padding: 0.75rem 1rem !important;
+        padding: 0.875rem 1rem !important;
         color: var(--text-1) !important; 
         transition: all 0.3s !important;
     }
-    .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus { 
+    .stTextInput input:focus, 
+    .stNumberInput input:focus, 
+    .stTextArea textarea:focus { 
         border-color: var(--primary) !important; 
         box-shadow: 0 0 0 3px var(--glow) !important; 
         background: var(--bg-3) !important; 
+        outline: none !important;
     }
-    .stTextInput label, .stNumberInput label, .stTextArea label, .stSelectbox label { 
+    .stTextInput label, 
+    .stNumberInput label, 
+    .stTextArea label, 
+    .stSelectbox label { 
         color: var(--text-1) !important; 
         font-weight: 600 !important; 
         margin-bottom: 0.5rem !important;
+        font-size: 0.95rem !important;
     }
     
     /* Select */
@@ -142,8 +207,13 @@ st.markdown("""
         border-radius: 12px !important; 
         color: var(--text-1) !important; 
     }
+    .stSelectbox [data-baseweb="select"] {
+        background: var(--bg-2) !important;
+    }
     
+    /* ============================================ */
     /* Alerts */
+    /* ============================================ */
     .stAlert { 
         background: var(--bg-2) !important; 
         border: 1px solid var(--border) !important; 
@@ -153,35 +223,43 @@ st.markdown("""
         color: var(--text-1) !important; 
     }
     .stSuccess { 
-        background: rgba(52,211,153,0.1) !important; 
+        background: rgba(52,211,153,0.15) !important; 
         border-left-color: var(--success) !important; 
         color: var(--success) !important; 
     }
     .stInfo { 
-        background: rgba(129,140,248,0.1) !important; 
+        background: rgba(129,140,248,0.15) !important; 
         border-left-color: var(--primary) !important;
-        color: var(--text-1) !important; 
+        color: var(--primary) !important; 
     }
     .stWarning {
-        background: rgba(251,191,36,0.1) !important;
+        background: rgba(251,191,36,0.15) !important;
         border-left-color: var(--accent) !important;
         color: var(--accent) !important;
     }
     .stError {
-        background: rgba(248,113,113,0.1) !important;
+        background: rgba(248,113,113,0.15) !important;
         border-left-color: var(--danger) !important;
         color: var(--danger) !important;
     }
     
-    /* Progress */
-    .stProgress > div > div { background: var(--bg-3) !important; border-radius: 9999px !important; }
+    /* ============================================ */
+    /* Progress Bar */
+    /* ============================================ */
+    .stProgress > div > div { 
+        background: var(--bg-3) !important; 
+        border-radius: 9999px !important; 
+        height: 10px !important;
+    }
     .stProgress > div > div > div { 
         background: linear-gradient(90deg, var(--primary), var(--secondary)) !important; 
-        box-shadow: 0 0 20px var(--glow) !important; 
+        box-shadow: 0 0 25px var(--glow) !important; 
         border-radius: 9999px !important;
     }
     
+    /* ============================================ */
     /* Sidebar */
+    /* ============================================ */
     [data-testid="stSidebar"] { 
         background: var(--bg-2) !important; 
         border-right: 1px solid var(--border) !important; 
@@ -190,56 +268,96 @@ st.markdown("""
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] span { 
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] div { 
         color: var(--text-1) !important; 
     }
     
-    /* Code */
+    /* ============================================ */
+    /* Code Blocks */
+    /* ============================================ */
     code { 
         background: var(--bg-3) !important; 
         color: var(--primary) !important; 
-        padding: 0.25rem 0.5rem !important; 
+        padding: 0.3rem 0.6rem !important; 
         border-radius: 6px !important; 
         border: 1px solid var(--border) !important;
         font-size: 0.875rem !important;
+        font-family: 'Fira Code', 'Courier New', monospace !important;
     }
     
     pre {
         background: var(--bg-3) !important;
         border: 1px solid var(--border) !important;
         border-radius: 12px !important;
-        padding: 1rem !important;
+        padding: 1.25rem !important;
     }
     
     pre code {
         background: transparent !important;
         border: none !important;
+        padding: 0 !important;
     }
     
+    /* ============================================ */
     /* Dividers */
-    hr { border: none !important; height: 1px !important; background: var(--border) !important; margin: 2rem 0 !important; }
+    /* ============================================ */
+    hr { 
+        border: none !important; 
+        height: 1px !important; 
+        background: var(--border) !important; 
+        margin: 2.5rem 0 !important; 
+    }
     
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-track { background: var(--bg-2); border-radius: 9999px; }
+    /* ============================================ */
+    /* Scrollbar NOIR */
+    /* ============================================ */
+    ::-webkit-scrollbar { 
+        width: 12px; 
+        height: 12px; 
+    }
+    ::-webkit-scrollbar-track { 
+        background: var(--bg-1); 
+        border-radius: 9999px; 
+    }
     ::-webkit-scrollbar-thumb { 
         background: linear-gradient(135deg, var(--primary), var(--secondary)); 
         border-radius: 9999px; 
-        box-shadow: 0 0 10px var(--glow);
+        box-shadow: 0 0 15px var(--glow);
+        border: 2px solid var(--bg-1);
     }
-    ::-webkit-scrollbar-thumb:hover { opacity: 0.8; }
+    ::-webkit-scrollbar-thumb:hover { 
+        background: var(--primary);
+        box-shadow: 0 0 25px var(--glow);
+    }
     
+    /* ============================================ */
     /* Animations */
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .element-container { animation: fadeIn 0.5s ease-out; }
+    /* ============================================ */
+    @keyframes fadeIn { 
+        from { opacity: 0; transform: translateY(15px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+    @keyframes glow-pulse {
+        0%, 100% { box-shadow: 0 0 20px var(--glow); }
+        50% { box-shadow: 0 0 35px var(--glow); }
+    }
     
+    .element-container { 
+        animation: fadeIn 0.6s ease-out; 
+    }
+    
+    /* ============================================ */
     /* Responsive */
+    /* ============================================ */
     @media (max-width: 768px) { 
         .block-container { padding: 1.5rem 1rem !important; } 
         h1 { font-size: 2rem !important; }
         h2 { font-size: 1.5rem !important; }
+        .stExpander summary { padding: 1.25rem 1rem !important; min-height: 65px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
