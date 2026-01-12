@@ -33,13 +33,20 @@ st.markdown("**Auditez vos pages produits e-commerce** : détection de schema.or
 with st.sidebar:
     st.header("⚙️ Paramètres du scan")
     
+    st.info("""
+    💡 **Astuce** : 
+    - Pour scanner **tout un site** → utilisez l'URL racine + un template
+    - Pour scanner **une page unique** → entrez l'URL complète de la page
+    """)
+    
     max_pages = st.number_input("Nombre max de pages", min_value=1, max_value=200, value=50)
     
     st.subheader("Filtres d'URL")
+    st.caption("Les filtres permettent de cibler uniquement les pages produits")
     
     template = st.selectbox(
         "Template prédéfini",
-        ["Personnalisé", "Shopify", "PrestaShop", "Magento", "WooCommerce"]
+        ["Personnalisé", "Shopify", "PrestaShop", "Magento", "WooCommerce", "Aucun filtre"]
     )
     
     if template == "Shopify":
@@ -54,16 +61,20 @@ with st.sidebar:
     elif template == "WooCommerce":
         include_pattern = "/product/"
         exclude_patterns = ["/cart", "/checkout", "/my-account"]
+    elif template == "Aucun filtre":
+        include_pattern = ""
+        exclude_patterns = []
+        st.warning("⚠️ Aucun filtre : toutes les pages seront analysées")
     else:
         include_pattern = st.text_input(
             "Pattern d'inclusion (regex)",
             value="",
-            help="Ex: /products/ ou /[0-9]+-.*\.html$"
+            help="Ex: /products/ ou /[0-9]+-.*\.html$ - Laissez vide pour tout inclure"
         )
         exclude_patterns_text = st.text_area(
             "Patterns d'exclusion (un par ligne)",
             value="/account\n/cart\n/checkout",
-            help="URLs à exclure du scan"
+            help="URLs à exclure du scan - Laissez vide pour ne rien exclure"
         )
         exclude_patterns = [p.strip() for p in exclude_patterns_text.split("\n") if p.strip()]
 
@@ -208,9 +219,23 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
     urls = await discover_urls(root_url, progress_bar)
     
     # Filtrage
+    urls_before_filter = len(urls)
     urls = [u for u in urls if same_domain(u, root_url)]
     urls = [u for u in urls if url_allowed(u, include_pattern, exclude_patterns)]
     urls = urls[:max_pages]
+    
+    # Vérification si on a des URLs à analyser
+    if len(urls) == 0:
+        return {
+            "error": True,
+            "message": f"Aucune URL trouvée après filtrage. {urls_before_filter} URL(s) découverte(s) mais aucune ne correspond aux filtres.",
+            "suggestions": [
+                "✅ Essayez sans filtre (sélectionnez 'Personnalisé' et laissez le champ vide)",
+                "✅ Vérifiez que le site a un sitemap.xml accessible",
+                "✅ Ou entrez directement une URL de page produit",
+                f"✅ URLs découvertes : {urls_before_filter}"
+            ]
+        }
     
     status_text.text(f"📊 Analyse de {len(urls)} page(s)...")
     
@@ -272,15 +297,34 @@ async def run_audit(root_url: str, max_pages: int, include_pattern: str,
 
 # Interface principale
 root_url = st.text_input(
-    "🌐 URL du site à auditer",
+    "🌐 URL à auditer",
     value="https://www.vetdepro.com",
-    help="Ex: https://www.monsite.com"
+    help="Entrez soit l'URL du site complet (ex: https://monsite.com) soit l'URL d'une page produit spécifique",
+    placeholder="Ex: https://www.monsite.com ou https://www.monsite.com/produit/chaussures"
 )
 
 col1, col2 = st.columns([1, 4])
 
 with col1:
     scan_button = st.button("🚀 Lancer le scan", type="primary", use_container_width=True)
+
+with col2:
+    with st.expander("💡 Exemples d'utilisation"):
+        st.markdown("""
+        **Cas 1 : Scanner tout un site e-commerce**
+        - URL : `https://www.monsite.com`
+        - Template : Shopify / PrestaShop / etc.
+        - Résultat : Analyse toutes les pages produits du site
+        
+        **Cas 2 : Scanner une page produit spécifique**
+        - URL : `https://www.monsite.com/produit/chaussures-123`
+        - Template : Aucun filtre (ou Personnalisé sans filtre)
+        - Résultat : Analyse uniquement cette page
+        
+        **Cas 3 : Si aucune page n'est trouvée**
+        - Sélectionnez "Aucun filtre" dans la sidebar
+        - Ou entrez directement l'URL de la page produit
+        """)
 
 if scan_button:
     if not root_url:
@@ -302,12 +346,20 @@ if scan_button:
                 status_text
             ))
             
+            status_text.empty()
+            progress_bar.empty()
+            
+            # Vérifier si c'est une erreur
+            if isinstance(results, dict) and results.get("error"):
+                st.error(f"⚠️ {results['message']}")
+                st.info("💡 **Suggestions :**")
+                for suggestion in results.get("suggestions", []):
+                    st.write(suggestion)
+                return
+            
             # Stocke les résultats dans la session
             st.session_state.results = results
             st.session_state.root_url = root_url
-            
-            status_text.empty()
-            progress_bar.empty()
             
             # Statistiques globales
             total = len(results)
