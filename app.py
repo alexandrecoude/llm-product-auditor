@@ -8,11 +8,6 @@ import pandas as pd
 from io import StringIO
 import time
 
-st.set_page_config(
-    page_title="LLM Product Page Auditor",
-    page_icon="🔍",
-    layout="wide"
-)
 
 # Configuration de la page
 st.set_page_config(
@@ -25,363 +20,226 @@ st.set_page_config(
 # CSS personnalisé inspiré de Finary
 st.markdown("""
 <style>
-    /* Imports Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
-    /* Variables globales */
     :root {
-        --primary-color: #6366f1;
-        --secondary-color: #8b5cf6;
-        --accent-color: #f59e0b;
-        --success-color: #10b981;
-        --warning-color: #f59e0b;
-        --danger-color: #ef4444;
-        --bg-primary: #ffffff;
-        --bg-secondary: #f8fafc;
-        --text-primary: #0f172a;
-        --text-secondary: #64748b;
-        --border-color: #e2e8f0;
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        --radius-sm: 8px;
-        --radius-md: 12px;
-        --radius-lg: 16px;
+        --primary: #818cf8;
+        --secondary: #a78bfa;
+        --accent: #fbbf24;
+        --success: #34d399;
+        --danger: #f87171;
+        --bg-1: #0f172a;
+        --bg-2: #1e293b;
+        --bg-3: #334155;
+        --text-1: #f1f5f9;
+        --text-2: #cbd5e1;
+        --text-3: #94a3b8;
+        --border: #334155;
+        --shadow: rgba(0,0,0,0.5);
+        --glow: rgba(129,140,248,0.3);
     }
     
-    /* Reset & Base */
-    * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    }
-    
-    /* Corps principal */
-    .main {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 0 !important;
-    }
-    
-    .block-container {
-        padding: 3rem 4rem !important;
-        max-width: 1400px !important;
-        background: var(--bg-primary);
-        border-radius: var(--radius-lg);
-        margin: 2rem auto !important;
-        box-shadow: var(--shadow-xl);
-    }
+    * { font-family: 'Inter', sans-serif !important; }
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] { background: var(--bg-1) !important; }
+    .main { background: var(--bg-1) !important; }
+    .block-container { padding: 3rem 4rem !important; max-width: 1400px !important; margin: 0 auto !important; }
     
     /* Titres */
-    h1 {
-        font-size: 3rem !important;
-        font-weight: 800 !important;
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem !important;
-        letter-spacing: -0.02em !important;
+    h1 { 
+        font-size: 3rem !important; 
+        font-weight: 800 !important; 
+        background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+        -webkit-background-clip: text !important; 
+        -webkit-text-fill-color: transparent !important;
+        margin: 0.5rem 0 !important;
+        text-align: center !important;
     }
+    h2 { font-size: 1.875rem !important; font-weight: 700 !important; color: var(--text-1) !important; margin: 2rem 0 1rem !important; }
+    h3 { font-size: 1.5rem !important; font-weight: 600 !important; color: var(--text-1) !important; margin: 1.5rem 0 0.75rem !important; }
+    h4 { font-size: 1.25rem !important; font-weight: 600 !important; color: var(--text-1) !important; margin: 1rem 0 0.5rem !important; }
+    p, span, div, label { color: var(--text-2) !important; }
     
-    h2 {
-        font-size: 1.875rem !important;
-        font-weight: 700 !important;
-        color: var(--text-primary) !important;
-        margin-top: 2rem !important;
+    /* FIX CRITIQUE: Expanders - padding et line-height corrects */
+    .stExpander { 
+        background: var(--bg-2) !important; 
+        border: 1px solid var(--border) !important; 
+        border-radius: 12px !important; 
         margin-bottom: 1rem !important;
+        overflow: hidden !important;
     }
     
-    h3 {
-        font-size: 1.25rem !important;
+    .stExpander summary {
+        background: var(--bg-3) !important;
+        padding: 1.25rem 1.5rem !important;  /* Plus de padding vertical */
+        min-height: 60px !important;  /* Hauteur minimale pour éviter écrasement */
         font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        margin-top: 1.5rem !important;
-        margin-bottom: 0.75rem !important;
+        font-size: 0.95rem !important;
+        color: var(--text-1) !important;
+        line-height: 1.8 !important;  /* Plus d'espace entre les lignes */
+        display: flex !important;
+        align-items: center !important;
+        cursor: pointer !important;
     }
     
-    /* Sous-titre */
-    .element-container:has(> .stMarkdown > p:first-child) p:first-of-type {
-        font-size: 1.125rem !important;
-        color: var(--text-secondary) !important;
-        font-weight: 400 !important;
-        line-height: 1.75 !important;
+    .stExpander summary:hover {
+        background: #3f4b5e !important;
+        transition: background 0.2s ease !important;
     }
     
-    /* Cards et containers */
-    .stExpander {
-        background: white !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: var(--radius-md) !important;
-        box-shadow: var(--shadow-sm) !important;
-        margin-bottom: 1rem !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stExpander:hover {
-        box-shadow: var(--shadow-md) !important;
-        transform: translateY(-2px);
-    }
-    
-    .stExpander > div:first-child {
-        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%) !important;
-        border-radius: var(--radius-md) !important;
-        padding: 1.25rem !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-    }
-    
-    /* Metrics */
-    [data-testid="stMetricValue"] {
-        font-size: 2.5rem !important;
-        font-weight: 800 !important;
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    [data-testid="stMetricLabel"] {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: var(--text-secondary) !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
+    /* Contenu de l'expander */
+    .stExpander > div:not(summary) {
+        padding: 1.5rem !important;
+        background: var(--bg-2) !important;
     }
     
     /* Boutons */
-    .stButton > button {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: var(--radius-md) !important;
-        padding: 0.75rem 2rem !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        box-shadow: var(--shadow-md) !important;
+    .stButton > button { 
+        background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; 
+        color: white !important; 
+        border: none !important; 
+        border-radius: 12px !important; 
+        padding: 0.75rem 2rem !important; 
+        font-weight: 600 !important; 
+        box-shadow: 0 4px 6px var(--shadow), 0 0 20px var(--glow) !important;
         transition: all 0.3s ease !important;
-        text-transform: none !important;
     }
-    
-    .stButton > button:hover {
-        box-shadow: var(--shadow-lg) !important;
-        transform: translateY(-2px);
-    }
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px var(--shadow), 0 0 30px var(--glow) !important; }
     
     .stDownloadButton > button {
-        background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%) !important;
-        color: white !important;
+        background: linear-gradient(135deg, var(--success), #10b981) !important;
+        color: var(--bg-1) !important;
         border: none !important;
-        border-radius: var(--radius-md) !important;
+        border-radius: 12px !important;
         padding: 0.625rem 1.5rem !important;
         font-weight: 600 !important;
-        box-shadow: var(--shadow-sm) !important;
+        box-shadow: 0 4px 6px var(--shadow) !important;
     }
     
     /* Inputs */
-    .stTextInput > div > div > input,
-    .stNumberInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        border: 2px solid var(--border-color) !important;
-        border-radius: var(--radius-md) !important;
+    .stTextInput input, .stNumberInput input, .stTextArea textarea { 
+        background: var(--bg-2) !important; 
+        border: 2px solid var(--border) !important; 
+        border-radius: 12px !important; 
         padding: 0.75rem 1rem !important;
-        font-size: 1rem !important;
-        transition: all 0.3s ease !important;
-        background: white !important;
+        color: var(--text-1) !important; 
+        transition: all 0.3s !important;
+    }
+    .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus { 
+        border-color: var(--primary) !important; 
+        box-shadow: 0 0 0 3px var(--glow) !important; 
+        background: var(--bg-3) !important; 
+    }
+    .stTextInput label, .stNumberInput label, .stTextArea label, .stSelectbox label { 
+        color: var(--text-1) !important; 
+        font-weight: 600 !important; 
+        margin-bottom: 0.5rem !important;
     }
     
-    .stTextInput > div > div > input:focus,
-    .stNumberInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border-color: var(--primary-color) !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
-    }
-    
-    /* Select boxes */
-    .stSelectbox > div > div {
-        border: 2px solid var(--border-color) !important;
-        border-radius: var(--radius-md) !important;
-        background: white !important;
+    /* Select */
+    .stSelectbox > div > div { 
+        background: var(--bg-2) !important; 
+        border: 2px solid var(--border) !important; 
+        border-radius: 12px !important; 
+        color: var(--text-1) !important; 
     }
     
     /* Alerts */
-    .stAlert {
-        background: linear-gradient(135deg, #ede9fe 0%, #f3f4f6 100%) !important;
-        border: none !important;
-        border-left: 4px solid var(--primary-color) !important;
-        border-radius: var(--radius-md) !important;
+    .stAlert { 
+        background: var(--bg-2) !important; 
+        border: 1px solid var(--border) !important; 
+        border-left: 4px solid var(--primary) !important; 
+        border-radius: 12px !important; 
         padding: 1rem 1.25rem !important;
-        color: var(--text-primary) !important;
+        color: var(--text-1) !important; 
     }
-    
-    .stSuccess {
-        background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%) !important;
-        border-left-color: var(--success-color) !important;
+    .stSuccess { 
+        background: rgba(52,211,153,0.1) !important; 
+        border-left-color: var(--success) !important; 
+        color: var(--success) !important; 
     }
-    
+    .stInfo { 
+        background: rgba(129,140,248,0.1) !important; 
+        border-left-color: var(--primary) !important;
+        color: var(--text-1) !important; 
+    }
     .stWarning {
-        background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%) !important;
-        border-left-color: var(--warning-color) !important;
+        background: rgba(251,191,36,0.1) !important;
+        border-left-color: var(--accent) !important;
+        color: var(--accent) !important;
     }
-    
     .stError {
-        background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%) !important;
-        border-left-color: var(--danger-color) !important;
+        background: rgba(248,113,113,0.1) !important;
+        border-left-color: var(--danger) !important;
+        color: var(--danger) !important;
     }
     
-    /* Progress bar */
-    .stProgress > div > div > div {
-        background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+    /* Progress */
+    .stProgress > div > div { background: var(--bg-3) !important; border-radius: 9999px !important; }
+    .stProgress > div > div > div { 
+        background: linear-gradient(90deg, var(--primary), var(--secondary)) !important; 
+        box-shadow: 0 0 20px var(--glow) !important; 
         border-radius: 9999px !important;
     }
     
     /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%) !important;
-        border-right: 1px solid var(--border-color) !important;
+    [data-testid="stSidebar"] { 
+        background: var(--bg-2) !important; 
+        border-right: 1px solid var(--border) !important; 
         padding: 2rem 1.5rem !important;
     }
-    
-    [data-testid="stSidebar"] .stMarkdown {
-        color: var(--text-primary) !important;
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span { 
+        color: var(--text-1) !important; 
     }
     
-    /* Code blocks */
-    code {
-        background: var(--bg-secondary) !important;
-        color: var(--primary-color) !important;
-        padding: 0.25rem 0.5rem !important;
-        border-radius: var(--radius-sm) !important;
+    /* Code */
+    code { 
+        background: var(--bg-3) !important; 
+        color: var(--primary) !important; 
+        padding: 0.25rem 0.5rem !important; 
+        border-radius: 6px !important; 
+        border: 1px solid var(--border) !important;
         font-size: 0.875rem !important;
-        font-weight: 500 !important;
     }
     
-    /* Tables */
-    table {
-        border-collapse: separate !important;
-        border-spacing: 0 !important;
-        width: 100% !important;
-        border-radius: var(--radius-md) !important;
-        overflow: hidden !important;
-        box-shadow: var(--shadow-sm) !important;
-    }
-    
-    thead {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
-    }
-    
-    thead th {
-        color: white !important;
-        font-weight: 600 !important;
+    pre {
+        background: var(--bg-3) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
         padding: 1rem !important;
-        text-align: left !important;
     }
     
-    tbody tr {
-        background: white !important;
-        border-bottom: 1px solid var(--border-color) !important;
-    }
-    
-    tbody tr:hover {
-        background: var(--bg-secondary) !important;
-    }
-    
-    tbody td {
-        padding: 1rem !important;
-        color: var(--text-primary) !important;
-    }
-    
-    /* Badges pour les priorités */
-    .priority-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    .badge-critical {
-        background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
-        color: #dc2626;
-    }
-    
-    .badge-important {
-        background: linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%);
-        color: #ea580c;
-    }
-    
-    .badge-recommended {
-        background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
-        color: #ca8a04;
-    }
-    
-    .badge-bonus {
-        background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
-        color: #059669;
+    pre code {
+        background: transparent !important;
+        border: none !important;
     }
     
     /* Dividers */
-    hr {
-        border: none !important;
-        height: 1px !important;
-        background: var(--border-color) !important;
-        margin: 2rem 0 !important;
-    }
+    hr { border: none !important; height: 1px !important; background: var(--border) !important; margin: 2rem 0 !important; }
     
-    /* Colonnes */
-    [data-testid="column"] {
-        background: transparent !important;
-        padding: 0.5rem !important;
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--bg-2); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb { 
+        background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+        border-radius: 9999px; 
+        box-shadow: 0 0 10px var(--glow);
     }
-    
-    /* Scrollbar personnalisée */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: var(--bg-secondary);
-        border-radius: 9999px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-        border-radius: 9999px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: var(--secondary-color);
-    }
+    ::-webkit-scrollbar-thumb:hover { opacity: 0.8; }
     
     /* Animations */
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .element-container {
-        animation: fadeIn 0.5s ease-out;
-    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .element-container { animation: fadeIn 0.5s ease-out; }
     
     /* Responsive */
-    @media (max-width: 768px) {
-        .block-container {
-            padding: 1.5rem 1rem !important;
-            margin: 1rem !important;
-        }
-        
-        h1 {
-            font-size: 2rem !important;
-        }
-        
-        h2 {
-            font-size: 1.5rem !important;
-        }
+    @media (max-width: 768px) { 
+        .block-container { padding: 1.5rem 1rem !important; } 
+        h1 { font-size: 2rem !important; }
+        h2 { font-size: 1.5rem !important; }
     }
 </style>
 """, unsafe_allow_html=True)
